@@ -1,0 +1,12 @@
+create table public.teacher_profiles (id uuid primary key references auth.users(id) on delete cascade, full_name text not null default '', school_name text not null default '', municipality text not null default '', primary_grade text not null default '', created_at timestamptz not null default now(), updated_at timestamptz not null default now());
+create table public.class_schedules (id uuid primary key default gen_random_uuid(), user_id uuid not null default auth.uid() references auth.users(id) on delete cascade, weekday smallint not null check (weekday between 1 and 5), start_time time, subject text not null, grade text not null default '', section text not null default '', duration_minutes integer not null default 45 check (duration_minutes between 1 and 600), created_at timestamptz not null default now());
+create table public.lesson_plans (id uuid primary key default gen_random_uuid(), user_id uuid not null default auth.uid() references auth.users(id) on delete cascade, subject text not null, grade text not null, topic text not null, content text not null, achievement_indicator text not null, evaluation_criteria text not null default '', duration_minutes integer not null check (duration_minutes between 1 and 600), lesson_date date not null, resources text not null default '', plan_body jsonb not null default '{}'::jsonb, created_at timestamptz not null default now(), updated_at timestamptz not null default now());
+alter table public.teacher_profiles enable row level security;
+alter table public.class_schedules enable row level security;
+alter table public.lesson_plans enable row level security;
+grant select, insert, update, delete on public.teacher_profiles, public.class_schedules, public.lesson_plans to authenticated;
+create policy "teachers manage own profile" on public.teacher_profiles for all to authenticated using ((select auth.uid()) = id) with check ((select auth.uid()) = id);
+create policy "teachers manage own schedules" on public.class_schedules for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+create policy "teachers manage own plans" on public.lesson_plans for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+create index class_schedules_user_weekday_idx on public.class_schedules(user_id, weekday, start_time);
+create index lesson_plans_user_date_idx on public.lesson_plans(user_id, lesson_date desc);
