@@ -30,6 +30,114 @@
 /* Clear landmarks, readable controls and a chronological lesson trail. */
 :root{--muted:#495c64;--line:#a9b9a0}.soft-btn{border-color:#8f9f88;border-width:1.5px}.danger-btn{border-color:#b75662;color:#a42e40}.primary{border:2px solid #4c7733}.card{border-color:#b3c1a7}input,select,textarea{border-color:#899b86}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid #244fa0;outline-offset:3px}button{min-height:44px}.muted{line-height:1.55}.plan-breadcrumb{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#eaf1fc;border:1.5px solid #9ab2dc;border-radius:12px;font-size:14px;margin:18px 0 10px}.plan-breadcrumb button{color:#244a85;padding:5px 3px;min-height:32px;text-decoration:underline}.plan-breadcrumb [aria-current]{font-weight:900;overflow-wrap:anywhere}.folder-heading{padding:14px;border:2px solid #9caf91;border-radius:15px;background:#f3f7ee;margin:10px 0 16px}.folder-heading h2{font-size:19px;flex:1;min-width:180px}.folder-heading .muted{flex-basis:100%;margin-left:0}#planes .filter-row{grid-template-columns:minmax(200px,1fr) 180px 175px auto;align-items:end;padding:15px;background:#f5f7f0;border:1px solid #b5c3aa;border-radius:14px}#planes .filter-row label{margin:0;font-size:14px}#clearPlanFilters{margin-bottom:0;min-height:47px}.plan-timeline{position:relative;margin:20px 0 0 12px;padding-left:27px;border-left:3px solid #789367}.timeline-day{position:relative;margin:0 0 28px}.timeline-day:before{content:'';position:absolute;left:-36px;top:21px;width:15px;height:15px;background:#2a58b5;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 2px #2a58b5}.timeline-date{display:flex;align-items:center;gap:15px;background:#e8effc;border:2px solid #6486c3;border-radius:15px;padding:12px 16px;margin-bottom:12px;color:#173f7c}.timeline-date-number{font-size:32px;font-weight:900;line-height:1.1;min-width:44px;text-align:center}.timeline-date h2{font-size:19px;margin:0 0 2px;text-transform:capitalize}.timeline-date time{font-size:14px}.timeline-date .pill{margin-left:auto;background:#fff;color:#244a85;border:1px solid #829cc8}.timeline-day .plan-list-row{background:#fff;border:1.5px solid #a5b59b;border-radius:14px;padding:16px;margin:10px 0;box-shadow:0 3px 8px #26374608}.timeline-day .plan-list-row h3{font-size:16px;line-height:1.5}.timeline-day .plan-list-row .muted{font-size:14px}.timeline-day .plan-list-row .row{align-content:center}.avatar-picker{border:1.5px solid #9caf91;border-radius:16px;padding:18px;margin:8px 0 20px;min-width:0}.avatar-picker legend{padding:0 8px;font-size:17px;font-weight:900}.avatar-options{display:flex;flex-wrap:wrap;gap:12px}.avatar-option{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;border:2px solid #9caf91;border-radius:16px;padding:13px;min-width:106px;cursor:pointer;background:#fff;margin:0}.avatar-option input{width:20px;height:20px;accent-color:#2a58b5;margin:0}.avatar-option img{width:54px;height:54px}.avatar-emoji{font-size:43px;line-height:54px}.avatar-option:has(input:checked){border:3px solid #2a58b5;background:#e8effc;padding:12px}.avatar-option:has(input:focus-visible){outline:3px solid #244fa0;outline-offset:3px}
 @media(max-width:720px){#planes .filter-row{grid-template-columns:1fr 1fr;padding:12px}.plan-search-label{grid-column:1/-1}#clearPlanFilters{grid-column:1/-1}.plan-breadcrumb{font-size:13px;align-items:flex-start}.folder-heading{padding:12px}.folder-heading h2{font-size:17px}.plan-timeline{margin-left:7px;padding-left:18px}.timeline-day:before{left:-27px;width:13px;height:13px}.timeline-date{padding:10px;gap:9px;flex-wrap:wrap}.timeline-date h2{font-size:18px}.timeline-date-number{font-size:30px}.timeline-date .pill{font-size:11px;padding:4px 7px}.timeline-day .plan-list-row{padding:13px}.avatar-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.avatar-option{min-width:0;padding:10px 6px;font-size:12px}.avatar-option:has(input:checked){padding:9px 5px}.avatar-picker{padding:12px}.subject-folder{border:2px solid #637866}.subject-folder small{font-size:12px}}
+
+/* Mobile-first visual refresh: calm surfaces and clear hierarchy. */
+:root{--cream:#f5f7fb;--navy:#202b40;--muted:#647189;--line:#e4e9f1;--soft:#f4f6fa;--sky:#466ce3;--sky-deep:#3457c4;--green:#d5edc8;--shadow:0 8px 30px #24365b06}
+body{font-family:'Nunito',system-ui,sans-serif;background:var(--cream);-webkit-font-smoothing:antialiased}
+header:not(.timeline-date){background:#fff;color:var(--navy);box-shadow:none;border-bottom:1px solid #e9edf5}
+.brand-light{color:var(--navy)}.tagline-light,.email-user{color:var(--muted)}
+.head-actions .ghost{color:#516078;border:1px solid #e5eaf3;background:#f7f9fc}
+.card,.auth-card{border:1px solid #e8ecf4;box-shadow:var(--shadow);border-radius:24px}
+button{font-weight:800;border-radius:13px;min-height:44px}button:hover{transform:none}
+.primary{background:var(--sky-deep);color:#fff;border:1px solid transparent;box-shadow:0 4px 10px #3457c418}.primary .icon{filter:brightness(0) invert(1)}
+.soft-btn{background:#f1f4fb;color:#36518c;border:1px solid #e4eaf7}
+.danger-btn{background:#fff5f5;color:#b94859;border:1px solid #f9e6e9}
+input,select,textarea{background:#f8faff;border:1px solid #e0e6f1;border-radius:13px;min-height:48px}
+input:focus,select:focus,textarea:focus{background:#fff;border-color:#7391e7;box-shadow:0 0 0 3px #466ce312}
+.tab{color:#65738a}.tab .icon{filter:none}.tab.active{background:#edf2ff;color:#3457c4}
+.hero{background:#fff;position:relative;overflow:hidden}.hero h1{line-height:1.2}.eyebrow{color:#73819b;letter-spacing:.12em}
+.dashboard-phrase{color:#607187;font-size:13px;line-height:1.6}
+.stat{border-color:#e8edf5;box-shadow:none;border-radius:20px}.stat strong{color:#2f466a}
+.subject-folder{border:0;border-radius:25px;box-shadow:none;padding:22px;min-height:210px}
+.subject-folder h2{font-weight:900}.subject-folder small{color:#364955;line-height:1.45}
+.plan-breadcrumb{background:transparent;border:0;padding:0;margin:20px 0;color:#78849a;font-size:13px}
+.plan-breadcrumb button{color:#657aaa;text-decoration:none;font-size:13px}
+.folder-heading{background:#f6f8fd;border:0;border-radius:17px;padding:16px;gap:10px}
+.folder-heading .soft-btn{background:#fff;color:#445c91;border-color:#e5eaf5}
+#planes .filter-row{background:transparent;border:0;padding:0;gap:12px}
+#planes .filter-row label{color:#617087;font-size:12px}
+#planResults{font-size:12px;color:#7b879b}
+.plan-timeline{border-left:2px solid #dce4f4}
+.timeline-day:before{background:#5c7cdd;border:3px solid #f5f7fb;box-shadow:none}
+.timeline-date{background:transparent;border:0;padding:4px 0 10px;color:#273d67;gap:12px}
+.timeline-date-number{background:#eaf0ff;color:#365cc6;border-radius:16px;padding:10px 8px;font-size:30px;min-width:60px}
+.timeline-date h2{font-size:18px}.timeline-date time{color:#76839a;font-size:12px}
+.timeline-date .pill{border:0;background:#edf3e9;color:#527342;font-size:11px}
+.timeline-day .plan-list-row{border:1px solid #e6ebf4;box-shadow:0 4px 18px #283f6205;border-radius:18px;padding:18px}
+.timeline-day .plan-list-row h3{font-size:15px;color:#2b3850;font-weight:800}
+.timeline-day .plan-list-row .muted{font-size:12px}
+.schedule-manager{background:#f7f9fd;border:1px solid #e6ebf4;border-radius:17px}
+.calendar-cell{border-color:#e7ecf5;border-radius:12px}.calendar-cell.today{border:2px solid #6e8ce2;background:#f5f8ff}
+.calendar-cell.has-holiday{border-color:#f0cedf;background:#fff4f8}
+.agenda-day{border-left:3px solid #b6c8f3;background:#fff}
+.avatar-picker{border:1px solid #e4eaf4;background:#f9faff;border-radius:20px}
+.avatar-option{border:1px solid #e1e7f2;background:#fff;border-radius:18px}
+.avatar-option:has(input:checked){border:2px solid #5678d9;background:#edf3ff;padding:12px}
+@media(max-width:720px){
+ body{font-size:15px;background:#f5f7fb}
+ header:not(.timeline-date){padding:13px 20px;position:sticky;top:0;z-index:10;background:#ffffffed;backdrop-filter:blur(16px)}
+ .brand-light{font-size:24px;letter-spacing:-1px}.brand-light .mark{width:33px;height:33px}
+ .head-actions{gap:9px}.head-actions .ghost{font-size:11px;padding:7px 9px;min-height:34px;border-radius:10px}
+ .avatar{width:35px;height:35px;background:#f0f3fa;border:2px solid #fff;box-shadow:0 0 0 1px #e8edf5}
+ main{padding:20px 16px calc(105px + env(safe-area-inset-bottom))}
+ .card{padding:20px 17px;border:0;border-radius:24px;margin-bottom:16px;box-shadow:0 5px 24px #233f6705}
+ h1{font-size:27px;line-height:1.15;letter-spacing:-.8px;margin-bottom:10px}
+ h2{font-size:19px;line-height:1.3}h3{line-height:1.4}
+ .muted{font-size:13px;line-height:1.6}.eyebrow{font-size:10px;margin-bottom:9px}
+ .hero{padding:22px 19px}.hero h1{font-size:28px;max-width:270px}.hero-mark{display:none}
+ .hero>.row{gap:9px}.hero .row{margin-top:16px}.hero .row button{flex:1 1 140px;font-size:13px;padding:12px}
+ .dashboard-phrase{font-size:12px;padding:12px;background:#f5f8fc;border-radius:13px;margin:15px 0}
+ .stats{gap:9px;margin-bottom:17px}.stat{padding:15px 10px;border:0;border-radius:18px;min-height:88px}
+ .stat strong{font-size:25px;line-height:1.2;margin-bottom:5px}.stat span{font-size:10px;line-height:1.35;display:block}
+ .section-title{gap:12px}.section-title>button{width:auto;font-size:12px;padding:9px 12px}
+ .nav{background:#ffffffed;backdrop-filter:blur(20px);border-top:1px solid #e9edf5;box-shadow:0 -5px 24px #273c5705;padding:9px 9px calc(9px + env(safe-area-inset-bottom));gap:6px}
+ .tab{font-size:10px;gap:5px;padding:8px 3px;border-radius:15px;min-height:52px;flex:1 1 0;color:#7d899d}
+ .tab .icon{width:21px;height:21px;opacity:.7}.tab.active{background:#edf2ff;color:#3457c4}.tab.active .icon{opacity:1}
+ .subject-folders{gap:11px;margin-top:16px}
+ .subject-folder{padding:17px 15px;min-height:205px;border:0;border-radius:23px;gap:7px}
+ .subject-folder h2{font-size:15px;line-height:1.3;letter-spacing:-.2px}
+ .subject-folder .folder-symbol{font-size:35px;margin:10px 0 5px}
+ .subject-folder .folder-count{font-size:12px}.subject-folder small{font-size:10px;line-height:1.4}
+ .plan-breadcrumb{font-size:12px;gap:7px;margin:16px 0 10px;align-items:center}
+ .plan-breadcrumb button{font-size:12px;white-space:nowrap}
+ .folder-heading{padding:13px;gap:10px;margin:10px 0 18px}
+ .folder-heading .soft-btn{font-size:11px;padding:7px 10px;min-height:36px}
+ .folder-heading h2{font-size:15px;line-height:1.4;min-width:0;flex:1 1 160px}
+ .folder-heading .muted{font-size:11px}
+ #planes .filter-row{grid-template-columns:1fr 1fr;gap:10px;padding:0;margin:17px 0 11px}
+ #planes .filter-row label{font-size:11px}#planes input,#planes select{font-size:13px;padding:11px 10px;min-height:46px}
+ #clearPlanFilters{font-size:11px;background:transparent;border:0;min-height:30px;padding:5px 0;justify-self:end;grid-column:1/-1;color:#526da5}
+ #planResults{font-size:11px;margin:8px 0 18px}
+ .plan-timeline{margin-left:5px;padding-left:17px;border-left:2px solid #e0e7f4}
+ .timeline-day{margin-bottom:24px}.timeline-day:before{left:-24px;top:22px;width:11px;height:11px;border:2px solid white}
+ .timeline-date{padding:0 0 10px;gap:10px;flex-wrap:nowrap;border-radius:0;min-width:0}
+ .timeline-date-number{font-size:26px;min-width:50px;padding:9px 7px;border-radius:14px}
+ .timeline-date h2{font-size:17px;margin-bottom:2px}.timeline-date time{font-size:11px}
+ .timeline-date .pill{font-size:9px;padding:5px 7px;white-space:nowrap;margin-left:auto}
+ .timeline-day .plan-list-row{padding:15px 13px;border:1px solid #edf0f6;border-radius:17px;gap:13px}
+ .timeline-day .plan-list-row h3{font-size:14px;line-height:1.55;margin-bottom:8px}
+ .timeline-day .plan-list-row .muted{font-size:11px}
+ .plan-list-row>.row{justify-content:space-between;padding-top:11px;border-top:1px solid #f0f3f8}
+ .plan-list-row button{font-size:12px;padding:9px 12px;min-height:40px}
+ label{font-size:12px}input,select,textarea{font-size:16px;padding:12px;min-height:49px}
+ .grid{gap:4px}.choice{border-color:#e5eaf2;background:#f7f9fc;font-size:12px;border-radius:12px;padding:11px}
+ .choice:has(input:checked){background:#edf3ff;border-color:#b5c6ef}
+ .avatar-picker{padding:14px;margin-top:5px}.avatar-picker legend{font-size:15px}.avatar-picker .muted{font-size:11px}
+ .avatar-options{gap:8px}.avatar-option{padding:11px 7px;font-size:11px;border-radius:16px}
+ .avatar-option:has(input:checked){padding:10px 6px;border-width:2px}
+ .avatar-option img{width:43px;height:43px}.avatar-emoji{font-size:35px;line-height:43px}.avatar-option input{width:17px;height:17px}
+ .calendar-toolbar{gap:7px}.calendar-toolbar strong{font-size:17px;padding:6px 0;text-transform:capitalize}
+ .calendar-toolbar button{border:0;min-width:42px}.calendar-toolbar select{font-size:14px}
+ .calendar-grid,.calendar-weekdays{gap:3px}.calendar-cell{border-radius:9px;min-height:95px}
+ .calendar-legend{font-size:10px;gap:9px;line-height:1.5}
+ .agenda-day{padding:12px 10px;border-radius:0 15px 15px 0}.agenda-day h3{font-size:15px}
+ .agenda-row{grid-template-columns:64px minmax(0,1fr)}.agenda-row strong{font-size:13px;line-height:1.5}.agenda-hour{font-size:11px}
+ .event-form,.schedule-manager{border-radius:16px;padding:12px}.schedule-manager summary{font-size:13px}
+ footer{font-size:11px;padding:0 20px calc(105px + env(safe-area-inset-bottom))}
+}
+@media(max-width:360px){main{padding-left:11px;padding-right:11px}.card{padding:17px 13px}.subject-folder{padding:14px 11px;min-height:196px}.subject-folder h2{font-size:14px}.timeline-date .pill{font-size:8px;padding:4px 5px}.tab{font-size:9px}.timeline-date h2{font-size:15px}}
+
+.subject-folder:nth-child(6n+1){background:#ddd9fa}.subject-folder:nth-child(6n+2){background:#f8dce9}.subject-folder:nth-child(6n+3){background:#e7edbd}.subject-folder:nth-child(6n+4){background:#f9dfcd}.subject-folder:nth-child(6n+5){background:#d9e8fa}.subject-folder:nth-child(6n){background:#d5eadd}
 </style>
 </head>
 <body>
@@ -71,7 +179,7 @@
       <section id="perfil" class="page hidden"><div class="card"><div class="eyebrow">Tus datos</div><h1>Perfil del docente</h1><p class="muted">Actualizá tus datos, materias y contexto escolar.</p><form id="profileForm" class="grid"><fieldset class="avatar-picker full"><legend>Elegí tu avatar</legend><p class="muted">Marcá el que más te guste. Se guardará al pulsar «Guardar perfil».</p><div class="avatar-options"><label class="avatar-option"><input type="radio" name="avatar_choice" value="woman"><img src="./icons/avatar-woman.svg" alt=""><span>Maestra</span></label><label class="avatar-option"><input type="radio" name="avatar_choice" value="man"><img src="./icons/avatar-man.svg" alt=""><span>Maestro</span></label><label class="avatar-option"><input type="radio" name="avatar_choice" value="flower"><span class="avatar-emoji" aria-hidden="true">🌻</span><span>Girasol</span></label><label class="avatar-option"><input type="radio" name="avatar_choice" value="owl"><span class="avatar-emoji" aria-hidden="true">🦉</span><span>Búho</span></label><label class="avatar-option"><input type="radio" name="avatar_choice" value="book"><span class="avatar-emoji" aria-hidden="true">📚</span><span>Libros</span></label></div></fieldset><label>Nombre<input name="first_name" autocomplete="given-name" required></label><label>Apellido<input name="last_name" autocomplete="family-name" required></label><label>¿Cómo te identificás?<select name="gender" required><option value="">Seleccioná</option><option value="mujer">Mujer</option><option value="varon">Varón</option></select></label><label>Modalidad<select name="modality" required><option value="">Seleccioná</option><option value="primaria">Primaria</option><option value="secundaria">Secundaria</option></select></label><label>Grado<select name="primary_grade" required><option value="">Seleccioná primero la modalidad</option></select></label><label>Rango de edad más frecuente<select name="student_age_range" required><option value="">Seleccioná</option><option>3–5 años</option><option>6–8 años</option><option>9–11 años</option><option>12–14 años</option><option>15–18 años</option><option>Edades variadas</option></select></label><label>Centro educativo<input name="school_name" placeholder="Nombre de la escuela"></label><label>Municipio<input name="municipality" placeholder="Municipio"></label><div class="full"><b>Materias que impartís</b><p class="muted">Las opciones cambian según modalidad y grado. También podés agregar las materias de tu centro.</p><div class="choice-list" data-subject-choices="profileForm"></div><div class="subject-add"><input name="custom_subject" placeholder="Nombre de otra asignatura" aria-label="Nombre de otra asignatura"><button class="soft-btn icon-button" type="button" data-add-subject="profileForm"><img class="icon" src="./icons/plus.svg" alt="">Agregar asignatura</button></div></div><div class="full"><h2 style="margin:12px 0 5px">Entorno docente</h2><p class="muted">Estas respuestas son privadas en tu perfil y sirven para adaptar las sugerencias.</p></div><label>Zona del centro<select name="context_zone"><option value="">Prefiero no responder</option><option>Urbana</option><option>Rural</option><option>Urbana y rural</option></select></label><label>Cantidad aproximada de estudiantes<select name="class_size"><option value="">Seleccioná</option><option>1–20</option><option>21–35</option><option>36–50</option><option>Más de 50</option></select></label><label>Acceso habitual a internet<select name="internet_access"><option value="">Seleccioná</option><option>Estable</option><option>Limitado</option><option>Sin acceso en el aula</option></select></label><div class="full"><b class="label-heading">Recursos disponibles</b><p class="muted">Desmarcá los que ya no tenés y marcá los que están disponibles.</p><div class="choice-list resource-choices" data-resource-choices="profileForm"></div><label class="resource-custom">Otro recurso<input name="other_resources" placeholder="Escribí otro recurso (opcional)"></label></div><label class="full">Desafíos al planificar<textarea name="planning_challenges"></textarea></label><label class="full">Dinámicas de interés<textarea name="preferred_dynamics"></textarea></label><div class="full form-actions"><button type="submit" class="primary">Guardar perfil</button></div></form><div id="profileStatus" class="status" aria-live="polite"></div></div></section>
     </main><footer>Syllabo · Planificación docente inteligente</footer>
   </div>
-  <script src="./ui.js?v=20261029-timeline-avatar-1"></script>
-  <script type="module" src="./app.js?v=20261029-timeline-avatar-1"></script>
+  <script src="./ui.js?v=20261029-mobile-refresh-1"></script>
+  <script type="module" src="./app.js?v=20261029-mobile-refresh-1"></script>
 </body></html>
 
