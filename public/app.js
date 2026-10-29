@@ -19,6 +19,11 @@ let generatedPlanText = '';
 let generatedPlanData = null;
 let allPlans = [];
 let pendingSignupEmail = '';
+let currentProfile = null;
+let calendarDate = new Date();
+let allCalendarPlans = [];
+let allCalendarEvents = [];
+let allCalendarSchedule = [];
 
 function setStatus(selector, message = '', type = '') {
   const el = $(selector); if (!el) return;
@@ -37,6 +42,7 @@ function showPage(page) {
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.page === page));
   if (page === 'planes') loadPlans();
   if (page === 'horario') loadSchedule();
+  if (page === 'calendario') loadCalendar();
   if (page === 'perfil') loadProfile();
   if (page === 'inicio') loadHome();
 }
@@ -60,20 +66,80 @@ async function ensureProfile() {
 async function openApp(user) {
   currentUser = user;
   $('#userEmail').textContent = user.email || '';
-  $('#auth').classList.add('hidden'); $('#app').classList.remove('hidden');
+  $('#auth').classList.add('hidden'); $('#app').classList.add('hidden');
   try {
-    const profile = await ensureProfile();
-    const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'docente';
-    $('#welcomeTitle').textContent = `¡Hola, ${fullName}!`;
-    if (profile.primary_grade && !$('#planForm').elements.grade.value) $('#planForm').elements.grade.value = profile.primary_grade;
-    for (const field of ['first_name','last_name','school_name','municipality','primary_grade']) {
-      if (profile[field]) $('#profileForm').elements[field].value = profile[field];
+    const profile = await ensureProfile(); currentProfile = profile;
+    if (!profile.onboarding_completed) {
+      $('#onboarding').classList.remove('hidden');
+      const form = $('#onboardingForm');
+      for (const key of ['first_name','last_name']) form.elements[key].value = profile[key] || user.user_metadata?.[key] || '';
+      populateGradeChoices(form, profile.modality || '');
+      return;
     }
+    $('#onboarding').classList.add('hidden'); $('#app').classList.remove('hidden');
+    fillTeacherForm($('#profileForm'), profile);
+    setTeacherIdentity(profile);
+    const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'docente';
+    $('#welcomeTitle').textContent = `¡Hola, ${profile.gender === 'mujer' ? 'maestra' : 'maestro'} ${fullName}!`;
+    if (profile.primary_grade && !$('#planForm').elements.grade.value) $('#planForm').elements.grade.value = profile.primary_grade;
+    for (const subject of profile.subjects || []) if (![...$('#subjects').options].some(option=>option.value===subject)) $('#subjects').insertAdjacentHTML('beforeend',`<option>${escapeHtml(subject)}</option>`);
     await loadHome();
-  } catch (err) {
-    setStatus('#planStatus', `No se pudo cargar tu perfil: ${friendlyError(err)}`, 'error');
-  }
+  } catch (err) { $('#auth').classList.remove('hidden'); setStatus('#authStatus', `No se pudo cargar tu perfil: ${friendlyError(err)}`, 'error'); }
 }
+const subjectOptions = ['Lengua y Literatura','Matemáticas','Ciencias Naturales','Estudios Sociales','Educación Física','Convivencia y Civismo','Inglés','Educación Artística','Otra'];
+function populateSubjectChoices(form, selected = []) {
+  const container = form.querySelector('[data-subject-choices]'); if (!container) return;
+  container.innerHTML = subjectOptions.map((subject, index) => `<label class="choice"><input type="checkbox" name="subject_choice" value="${escapeHtml(subject)}" ${selected.includes(subject)?'checked':''}>${escapeHtml(subject)}</label>`).join('');
+}
+function populateGradeChoices(form, modality, selected = '') {
+  const field = form.elements.primary_grade; if (!field) return;
+  const max = modality === 'primaria' ? 6 : modality === 'secundaria' ? 11 : 0;
+  const first = modality === 'secundaria' ? 7 : 1;
+  const options = max ? Array.from({length:max-first+1},(_,i)=>`${first+i}° grado`) : [];
+  field.innerHTML = '<option value="">Seleccioná un grado</option>' + options.map(value=>`<option value="${value}">${value}</option>`).join('') + '<option value="Multigrado">Multigrado</option>';
+  if (selected && !options.includes(selected) && selected !== 'Multigrado') field.insertAdjacentHTML('beforeend',`<option value="${escapeHtml(selected)}">${escapeHtml(selected)}</option>`);
+  field.value = selected || '';
+}
+for (const formId of ['onboardingForm','profileForm']) {
+  const form = $(`#${formId}`);
+  populateSubjectChoices(form);
+  form.elements.modality.addEventListener('change', () => populateGradeChoices(form, form.elements.modality.value));
+}
+function readProfileForm(form) {
+  const data = Object.fromEntries(new FormData(form).entries());
+  data.subjects = [...form.querySelectorAll('input[name="subject_choice"]:checked')].map(input=>input.value);
+  data.full_name = [data.first_name.trim(),data.last_name.trim()].filter(Boolean).join(' ');
+  data.teacher_context = Object.fromEntries(['context_zone','class_size','internet_access','available_resources','planning_challenges','preferred_dynamics'].map(key=>[key,data[key] || '']));
+  for (const key of Object.keys(data.teacher_context)) delete data[key];
+  return data;
+}
+function fillTeacherForm(form, profile) {
+  for (const key of ['first_name','last_name','gender','modality','primary_grade','school_name','municipality']) if (form.elements[key]) form.elements[key].value = profile[key] || '';
+  populateGradeChoices(form,profile.modality || '',profile.primary_grade || '');
+  populateSubjectChoices(form,profile.subjects || []);
+  const context = profile.teacher_context || {};
+  for (const key of ['context_zone','class_size','internet_access','available_resources','planning_challenges','preferred_dynamics']) if (form.elements[key]) form.elements[key].value = context[key] || '';
+}
+function setTeacherIdentity(profile) { $('#teacherAvatar').textContent = profile.gender === 'varon' ? '👨‍🏫' : '👩‍🏫'; }
+async function saveTeacherProfile(form, onboarding = false) {
+  const data = readProfileForm(form);
+  if (!data.subjects.length) throw new Error('Seleccioná al menos una materia.');
+  const row = {id:currentUser.id, ...data, onboarding_completed:true, updated_at:new Date().toISOString()};
+  const {data:saved,error} = await supabase.from('teacher_profiles').upsert(row).select().single();
+  if (error) throw error;
+  currentProfile = saved; fillTeacherForm($('#profileForm'),saved); setTeacherIdentity(saved);
+  $('#welcomeTitle').textContent = `¡Hola, ${saved.gender === 'mujer' ? 'maestra' : 'maestro'} ${saved.first_name}!`;
+  if (saved.primary_grade) $('#planForm').elements.grade.value = saved.primary_grade;
+  if (onboarding) { $('#onboarding').classList.add('hidden'); $('#app').classList.remove('hidden'); await loadHome(); }
+  return saved;
+}
+$('#onboardingForm').addEventListener('submit', async event => {
+  event.preventDefault(); const button=$('#finishOnboarding'); button.disabled=true; setStatus('#onboardingStatus','Guardando tu perfil…');
+  try { await saveTeacherProfile(event.currentTarget,true); }
+  catch(error) { setStatus('#onboardingStatus',friendlyError(error),'error'); }
+  finally { button.disabled=false; }
+});
+
 function friendlyError(error) {
   const message = error?.message || 'Ocurrió un problema inesperado.';
   if (/fetch|network/i.test(message)) return 'No se pudo conectar. Revisá tu conexión e intentá de nuevo.';
@@ -158,7 +224,7 @@ $('#recoveryForm').addEventListener('submit', async event => {
   else { $('#recoveryForm').classList.add('hidden'); $('#authForm').classList.remove('hidden'); setAuthMode(false); setStatus('#authStatus','Contraseña actualizada. Ya podés ingresar.','ok'); }
 });
 $('#logout').addEventListener('click', async () => {
-  await supabase.auth.signOut(); currentUser = null; setAuthMode(false); $('#app').classList.add('hidden'); $('#auth').classList.remove('hidden'); setStatus('#authStatus', 'Sesión cerrada.');
+  await supabase.auth.signOut(); currentUser = null; currentProfile=null; setAuthMode(false); $('#app').classList.add('hidden'); $('#onboarding').classList.add('hidden'); $('#auth').classList.remove('hidden'); setStatus('#authStatus', 'Sesión cerrada.');
 });
 
 function splitActivities(plan) {
@@ -208,7 +274,7 @@ function localDraft(data, teacher) {
     title: data.topic, teacher: [teacher.first_name, teacher.last_name].filter(Boolean).join(' '), school: teacher.school_name,
     subject: data.subject, grade: data.grade, lesson_date: data.lesson_date, duration_minutes: total, topic: data.topic,
     content: data.content, achievement_indicator: data.achievement_indicator, evaluation_criteria: data.evaluation_criteria,
-    resources: data.resources || 'Pizarra, cuaderno, lápiz y material visual disponible.',
+    resources: data.resources || teacher.teacher_context?.available_resources || 'Pizarra, cuaderno, lápiz y material visual disponible.',
     objective: `Que las y los estudiantes comprendan y trabajen ${data.content}, demostrando avances hacia este indicador: ${data.achievement_indicator}`,
     activities: [
       { moment:'Primer momento · Iniciación', minutes:opener, activity:`Dar la bienvenida y presentar el tema «${data.topic}». Activar saberes previos con preguntas: ¿qué sabemos?, ¿dónde lo hemos visto?, ¿qué queremos descubrir? Registrar algunas ideas y acordar el propósito de la clase.`, examples, assessment:'Escuchar las respuestas iniciales, valorar ideas previas y aclarar vocabulario que se necesite.' },
@@ -216,7 +282,7 @@ function localDraft(data, teacher) {
       { moment:'Tercer momento · Culminación', minutes:close, activity:`Invitar a algunos estudiantes a compartir su respuesta o producción. Cerrar con una síntesis colectiva: cada estudiante completa oralmente o por escrito «Hoy aprendí…» y «Todavía quiero practicar…».`, examples:'Aplicar una pregunta o ejercicio corto directamente relacionado con el indicador de logro.', assessment:`Recoger una respuesta breve de cada estudiante y verificarla con el indicador: ${data.achievement_indicator}` }
     ],
     evidence:`Producción o respuesta individual relacionada con «${data.content}», explicación oral del procedimiento y participación en la actividad. Revisar con estos criterios: ${data.evaluation_criteria || 'comprensión, participación y explicación de la respuesta.'}`,
-    differentiation:'Presentar instrucciones cortas en pasos; mostrar un ejemplo resuelto; apoyar con imágenes u objetos; permitir trabajar con una pareja de apoyo; ofrecer una consigna de ampliación a quien termine antes.',
+    differentiation:`Presentar instrucciones cortas en pasos; mostrar un ejemplo resuelto; apoyar con imágenes u objetos; permitir trabajar con una pareja de apoyo; ofrecer una consigna de ampliación a quien termine antes.${teacher.teacher_context?.internet_access==='Sin acceso en el aula'?' Priorizar materiales impresos, objetos del entorno y actividades que no requieran conexión.':''}${teacher.teacher_context?.planning_challenges?` Considerar el desafío que señaló el docente: ${teacher.teacher_context.planning_challenges}`:''}`,
     homework:''
   };
   plan.text = plainPlanText(plan);
@@ -287,7 +353,7 @@ async function loadPlans() {
   $('#plansList').innerHTML = '<div class="empty">Cargando tus planes…</div>';
   const { data, error } = await supabase.from('lesson_plans').select('id,subject,grade,topic,lesson_date,content,achievement_indicator,evaluation_criteria,duration_minutes,resources,plan_body,created_at').order('lesson_date', { ascending:false }).order('created_at', { ascending:false });
   if (error) { $('#plansList').innerHTML = `<div class="empty">${escapeHtml(friendlyError(error))}</div>`; return; }
-  allPlans = data || []; populatePlanMonths(allPlans); renderPlanList();
+  allPlans = data || []; populatePlanMonths(allPlans); populatePlanSubjects(allPlans); renderPlanList();
 }
 function populatePlanMonths(plans) {
   const select = $('#planMonth'); const selected = select.value;
@@ -295,15 +361,17 @@ function populatePlanMonths(plans) {
   select.innerHTML = '<option value="">Todas las fechas</option>' + months.map(month => `<option value="${month}">${escapeHtml(new Date(`${month}-15T12:00:00`).toLocaleDateString('es-NI',{month:'long',year:'numeric'}))}</option>`).join('');
   if (months.includes(selected)) select.value = selected;
 }
+function populatePlanSubjects(plans) { const select=$('#planSubject'); const selected=select.value; const values=[...new Set(plans.map(p=>p.subject).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));select.innerHTML='<option value="">Todas las asignaturas</option>'+values.map(value=>`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');if(values.includes(selected))select.value=selected; }
 function renderPlanList() {
-  const search = $('#planSearch').value.trim().toLocaleLowerCase(); const month = $('#planMonth').value;
-  const plans = allPlans.filter(p => (!month || p.lesson_date.startsWith(month)) && (!search || `${p.subject} ${p.grade} ${p.topic}`.toLocaleLowerCase().includes(search)));
+  const search = $('#planSearch').value.trim().toLocaleLowerCase(); const month = $('#planMonth').value; const subject=$('#planSubject').value; const sort=$('#planSort').value;
+  const plans = allPlans.filter(p => (!month || p.lesson_date.startsWith(month)) && (!subject || p.subject===subject) && (!search || `${p.subject} ${p.grade} ${p.topic}`.toLocaleLowerCase().includes(search)));
+  plans.sort((a,b)=>sort==='subject'?a.subject.localeCompare(b.subject,'es')||a.topic.localeCompare(b.topic,'es'):sort==='topic'?a.topic.localeCompare(b.topic,'es'):sort==='date-asc'?a.lesson_date.localeCompare(b.lesson_date):b.lesson_date.localeCompare(a.lesson_date));
   if (!plans.length) { $('#plansList').innerHTML = '<div class="empty">No encontramos planes con esos filtros. Creá tu primer plan para empezar.</div>'; return; }
   $('#plansList').innerHTML = plans.map(plan => `<article class="item"><div class="section-title"><div><div class="row"><span class="pill">${escapeHtml(prettyDate(plan.lesson_date))}</span><span class="pill green">${escapeHtml(plan.duration_minutes)} min</span></div><p class="item-title" style="margin-top:9px">${escapeHtml(plan.subject)} · ${escapeHtml(plan.grade)}</p><p>${escapeHtml(plan.topic)}</p></div><div class="row noprint"><button class="soft-btn" data-open-plan="${plan.id}">Abrir / editar</button><button class="danger-btn" data-delete-plan="${plan.id}">Eliminar</button></div></div></article>`).join('');
   plans.forEach(plan => $(`[data-open-plan="${plan.id}"]`).addEventListener('click', () => openSavedPlan(plan)));
   plans.forEach(plan => $(`[data-delete-plan="${plan.id}"]`).addEventListener('click', () => deletePlan(plan)));
 }
-$('#planSearch').addEventListener('input', renderPlanList); $('#planMonth').addEventListener('change', renderPlanList);
+$('#planSearch').addEventListener('input', renderPlanList); $('#planMonth').addEventListener('change', renderPlanList); $('#planSubject').addEventListener('change',renderPlanList); $('#planSort').addEventListener('change',renderPlanList);
 async function openSavedPlan(plan) {
   currentPlanId = plan.id;
   const form = $('#planForm');
@@ -326,55 +394,139 @@ async function deletePlan(plan) {
   if (error) alert(friendlyError(error)); else { await loadPlans(); await loadHome(); }
 }
 
+$('#establishSchedule').addEventListener('click', () => {
+  const form=$('#scheduleForm'); form.classList.toggle('hidden');
+  $('#establishSchedule').textContent=form.classList.contains('hidden')?'Establecer horario':'Cerrar formulario';
+  if(!form.classList.contains('hidden')) form.elements.subject.focus();
+});
 $('#scheduleForm').addEventListener('submit', async event => {
-  event.preventDefault(); const form = new FormData(event.currentTarget); const data = Object.fromEntries(form.entries());
-  data.weekday = Number(data.weekday); data.duration_minutes = Number(data.duration_minutes); data.start_time = data.start_time || null;
-  const button = event.currentTarget.querySelector('button[type="submit"]') || event.currentTarget.querySelector('button'); button.disabled = true;
-  const { error } = await supabase.from('class_schedules').insert(data); button.disabled = false;
-  if (error) { setStatus('#scheduleStatus', friendlyError(error), 'error'); return; }
-  event.currentTarget.reset(); event.currentTarget.elements.duration_minutes.value = 45; setStatus('#scheduleStatus', 'Clase agregada al horario.', 'ok'); await loadSchedule(); await loadHome();
+  event.preventDefault(); const form=event.currentTarget; const values=Object.fromEntries(new FormData(form).entries());
+  values.weekday=Number(values.weekday); values.duration_minutes=Number(values.duration_minutes); values.start_time=values.start_time || null;
+  const button=form.querySelector('button[type="submit"]') || form.querySelector('button'); button.disabled=true;
+  const {error}=await supabase.from('class_schedules').insert(values); button.disabled=false;
+  if(error){setStatus('#scheduleStatus',friendlyError(error),'error');return;}
+  form.reset(); form.elements.duration_minutes.value=45; setStatus('#scheduleStatus','Clase agregada a tu agenda semanal.','ok');
+  await loadSchedule(); await loadHome(); await loadCalendar();
 });
 async function loadSchedule() {
-  $('#scheduleList').innerHTML = '<div class="empty">Cargando horario…</div>';
-  const { data, error } = await supabase.from('class_schedules').select('*').order('weekday').order('start_time');
-  if (error) { $('#scheduleList').innerHTML = `<div class="empty">${escapeHtml(friendlyError(error))}</div>`; return; }
-  if (!data?.length) { $('#scheduleList').innerHTML = '<div class="empty">Todavía no cargaste clases. Agregá los bloques de tu semana arriba.</div>'; return; }
-  $('#scheduleList').innerHTML = data.map(item => `<article class="item"><div class="row"><span class="pill">${weekdays[item.weekday] || ''}</span><b>${escapeHtml((item.start_time || '').slice(0,5))}</b><span>${escapeHtml(item.subject)} · ${escapeHtml(item.grade)}${item.section ? ` · Sección ${escapeHtml(item.section)}` : ''}</span><span class="muted">${escapeHtml(item.duration_minutes)} min</span><button class="danger-btn" data-remove-schedule="${item.id}">Quitar</button></div></article>`).join('');
-  data.forEach(item => $(`[data-remove-schedule="${item.id}"]`).addEventListener('click', async () => {
-    if (!confirm(`¿Quitar ${item.subject} del horario?`)) return;
-    const { error:deleteError } = await supabase.from('class_schedules').delete().eq('id', item.id);
-    if (deleteError) setStatus('#scheduleStatus', friendlyError(deleteError), 'error'); else { setStatus('#scheduleStatus', 'Clase eliminada del horario.', 'ok'); await loadSchedule(); await loadHome(); }
+  $('#scheduleList').innerHTML='<div class="empty">Cargando agenda…</div>';
+  const {data,error}=await supabase.from('class_schedules').select('*').order('weekday').order('start_time');
+  if(error){$('#scheduleList').innerHTML=`<div class="empty">${escapeHtml(friendlyError(error))}</div>`;return;}
+  if(!data?.length){$('#scheduleList').innerHTML='<div class="empty">Todavía no configuraste tus bloques de clase. Usá “Establecer horario” para comenzar.</div>';$('#scheduleForm').classList.add('hidden');$('#establishSchedule').textContent='Establecer horario';return;}
+  $('#establishSchedule').textContent=$('#scheduleForm').classList.contains('hidden')?'Agregar bloque de clase':'Cerrar formulario';
+  $('#scheduleList').innerHTML=Object.entries(weekdays).map(([day,name])=>{
+    const items=data.filter(item=>item.weekday===Number(day)); if(!items.length)return '';
+    return `<section class="agenda-day"><h3>${name}</h3>${items.map(item=>`<div class="row" style="padding:8px 0;border-top:1px solid var(--line)"><span class="agenda-hour">${escapeHtml((item.start_time||'').slice(0,5))}</span><span><b>${escapeHtml(item.subject)}</b> · ${escapeHtml(item.grade)}${item.section?` · Sección ${escapeHtml(item.section)}`:''}</span><span class="muted">${escapeHtml(item.duration_minutes)} min</span><button class="danger-btn" data-remove-schedule="${item.id}">Quitar</button></div>`).join('')}</section>`;
+  }).join('');
+  data.forEach(item=>$(`[data-remove-schedule="${item.id}"]`).addEventListener('click',async()=>{
+    if(!confirm(`¿Quitar ${item.subject} del horario?`))return;
+    const {error:deleteError}=await supabase.from('class_schedules').delete().eq('id',item.id);
+    if(deleteError)setStatus('#scheduleStatus',friendlyError(deleteError),'error');else{setStatus('#scheduleStatus','Clase eliminada de tu agenda.','ok');await loadSchedule();await loadHome();await loadCalendar();}
   }));
+}
+
+
+const calendarWeekdays=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+$('#calendarView').addEventListener('change',renderCalendar);
+$('#calendarPrev').addEventListener('click',()=>{const view=$('#calendarView').value;if(view==='month')calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()-1,1,12);else calendarDate.setDate(calendarDate.getDate()-(view==='week'?7:1));loadCalendar();});
+$('#calendarNext').addEventListener('click',()=>{const view=$('#calendarView').value;if(view==='month')calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,1,12);else calendarDate.setDate(calendarDate.getDate()+(view==='week'?7:1));loadCalendar();});
+$('#calendarToday').addEventListener('click',()=>{calendarDate=new Date();loadCalendar();});
+$('#newCalendarEvent').addEventListener('click',()=>openCalendarEventForm({start_date:dateKey(calendarDate)}));
+$('#cancelCalendarEvent').addEventListener('click',()=>$('#calendarEventFormWrap').classList.add('hidden'));
+$('#calendarEventForm').addEventListener('submit',async event=>{
+  event.preventDefault();const data=Object.fromEntries(new FormData(event.currentTarget).entries());const id=data.id;delete data.id;
+  data.start_time=data.start_time||null;data.end_date=data.end_date||null;data.updated_at=new Date().toISOString();
+  if(data.end_date&&data.end_date<data.start_date){setStatus('#eventStatus','La fecha de fin debe ser igual o posterior a la fecha de inicio.','error');return;}
+  const query=supabase.from('calendar_events');const result=id?await query.update(data).eq('id',id).select().single():await query.insert(data).select().single();
+  if(result.error){setStatus('#eventStatus',friendlyError(result.error),'error');return;}
+  $('#calendarEventFormWrap').classList.add('hidden');await loadCalendar();
+});
+function openCalendarEventForm(eventData={}) {
+  const form=$('#calendarEventForm');form.reset();form.elements.id.value=eventData.id||'';
+  for(const key of ['title','event_type','start_date','end_date','start_time','notes'])if(eventData[key]!=null)form.elements[key].value=eventData[key];
+  $('#eventFormTitle').textContent=eventData.id?'Editar actividad o feriado':'Agregar actividad o feriado';$('#calendarEventFormWrap').classList.remove('hidden');setStatus('#eventStatus');$('#calendarEventForm').scrollIntoView({behavior:'smooth',block:'center'});
+}
+async function loadCalendar() {
+  if(!currentUser)return;
+  const [{data:plans,error:pErr},{data:events,error:eErr},{data:schedule,error:sErr}]=await Promise.all([
+    supabase.from('lesson_plans').select('*').order('lesson_date'),
+    supabase.from('calendar_events').select('*').order('start_date'),
+    supabase.from('class_schedules').select('id,weekday,start_time,subject,grade,section,duration_minutes').order('weekday').order('start_time')
+  ]);
+  const error=pErr||eErr||sErr;if(error){$('#calendarBoard').innerHTML=`<div class="empty">${escapeHtml(friendlyError(error))}</div>`;return;}
+  allCalendarPlans=plans||[];allCalendarEvents=events||[];allCalendarSchedule=schedule||[];renderCalendar();
+}
+function getCalendarItems(date) {
+  const key=dateKey(date),weekday=date.getDay();
+  const holiday=allCalendarEvents.some(item=>item.event_type==='feriado'&&item.start_date<=key&&(item.end_date||item.start_date)>=key);
+  const classes=holiday?[]:allCalendarSchedule.filter(item=>item.weekday===weekday).map(item=>({kind:'class',title:`${item.subject} · ${item.grade}`,time:(item.start_time||'').slice(0,5),item}));
+  const plans=allCalendarPlans.filter(item=>item.lesson_date===key).map(item=>({kind:'plan',title:`Plan: ${item.subject} · ${item.topic}`,time:'',item}));
+  const events=allCalendarEvents.filter(item=>item.start_date<=key&&(item.end_date||item.start_date)>=key).map(item=>({kind:item.event_type==='feriado'?'holiday':'event',title:item.title,time:(item.start_time||'').slice(0,5),item}));
+  return [...classes,...events,...plans].sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
+}
+function calendarEntry(item, date) {
+  const className=item.kind==='holiday'?'holiday':item.kind==='plan'?'plan':'';
+  const label=`${item.time?`${item.time} `:''}${item.title}`;
+  const action=item.kind==='event'||item.kind==='holiday'?`data-calendar-event="${item.item.id}"`:item.kind==='plan'?`data-calendar-plan="${item.item.id}"`:`data-calendar-class="${escapeHtml(dateKey(date))}" data-subject="${escapeHtml(item.item.subject)}" data-grade="${escapeHtml(item.item.grade)}" data-duration="${item.item.duration_minutes}"`;
+  return `<button class="calendar-entry ${className}" ${action} title="${escapeHtml(label)}">${escapeHtml(label)}</button>`;
+}
+function renderCalendar() {
+  if(!$('#calendarBoard'))return;const view=$('#calendarView').value;const monthName=calendarDate.toLocaleDateString('es-NI',{month:'long',year:'numeric'});
+  if(view==='month'){$('#calendarHeading').textContent=monthName;renderCalendarMonth();}
+  else if(view==='week'){const start=new Date(calendarDate);start.setDate(start.getDate()-((start.getDay()+6)%7));const end=new Date(start);end.setDate(start.getDate()+6);$('#calendarHeading').textContent=`${prettyDate(dateKey(start))} – ${prettyDate(dateKey(end))}`;renderCalendarAgenda(start,7);}
+  else{$('#calendarHeading').textContent=calendarDate.toLocaleDateString('es-NI',{weekday:'long',day:'numeric',month:'long',year:'numeric'});renderCalendarAgenda(calendarDate,1);}
+  bindCalendarEntries();
+}
+function renderCalendarMonth() {
+  const first=new Date(calendarDate.getFullYear(),calendarDate.getMonth(),1,12);const offset=(first.getDay()+6)%7;const start=new Date(first);start.setDate(first.getDate()-offset);const days=Array.from({length:42},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d;});
+  $('#calendarBoard').innerHTML=`<div class="calendar-weekdays">${calendarWeekdays.map(day=>`<span>${day}</span>`).join('')}</div><div class="calendar-grid">${days.map(date=>{const items=getCalendarItems(date);return `<div class="calendar-cell ${date.getMonth()!==calendarDate.getMonth()?'outside':''} ${dateKey(date)===localISODate()?'today':''}"><div class="calendar-cell-head"><span>${date.getDate()}</span><button class="text-btn" data-add-date="${dateKey(date)}" aria-label="Agregar evento">+</button></div>${items.slice(0,3).map(item=>calendarEntry(item,date)).join('')}${items.length>3?`<span class="muted">+${items.length-3} más</span>`:''}</div>`;}).join('')}</div>`;
+}
+function renderCalendarAgenda(start,count) {
+  const days=Array.from({length:count},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d;});
+  $('#calendarBoard').innerHTML=days.map(date=>{const items=getCalendarItems(date);return `<section class="agenda-day"><div class="section-title"><h3>${date.toLocaleDateString('es-NI',{weekday:'long',day:'numeric',month:'long'})}</h3><button class="text-btn" data-add-date="${dateKey(date)}">+ Agregar fecha</button></div>${items.length?items.map(item=>`<div class="row" style="padding:8px 0;border-top:1px solid var(--line)"><span class="agenda-hour">${escapeHtml(item.time|| (item.kind==='plan'?'Plan':'Todo el día'))}</span><span>${escapeHtml(item.title)}</span>${item.kind==='event'||item.kind==='holiday'?`<button class="soft-btn" data-edit-event="${item.item.id}">Editar</button><button class="danger-btn" data-delete-event="${item.item.id}">Eliminar</button>`:item.kind==='class'?`<button class="soft-btn" data-calendar-class="${dateKey(date)}" data-subject="${escapeHtml(item.item.subject)}" data-grade="${escapeHtml(item.item.grade)}" data-duration="${item.item.duration_minutes}">Planear</button>`:''}</div>`).join(''):'<p class="muted">Sin clases ni fechas registradas.</p>'}</section>`;}).join('');
+}
+function bindCalendarEntries() {
+  $('#calendarBoard').querySelectorAll('[data-add-date]').forEach(button=>button.addEventListener('click',()=>openCalendarEventForm({start_date:button.dataset.addDate})));
+  $('#calendarBoard').querySelectorAll('[data-calendar-event]').forEach(button=>button.addEventListener('click',()=>{const event=allCalendarEvents.find(item=>item.id===button.dataset.calendarEvent);if(event)openCalendarEventForm(event);}));
+  $('#calendarBoard').querySelectorAll('[data-edit-event]').forEach(button=>button.addEventListener('click',()=>{const event=allCalendarEvents.find(item=>item.id===button.dataset.editEvent);if(event)openCalendarEventForm(event);}));
+  $('#calendarBoard').querySelectorAll('[data-delete-event]').forEach(button=>button.addEventListener('click',async()=>{const event=allCalendarEvents.find(item=>item.id===button.dataset.deleteEvent);if(!event||!confirm(`¿Eliminar “${event.title}” del calendario?`))return;const {error}=await supabase.from('calendar_events').delete().eq('id',event.id);if(error)alert(friendlyError(error));else loadCalendar();}));
+  $('#calendarBoard').querySelectorAll('[data-calendar-plan]').forEach(button=>button.addEventListener('click',()=>{const plan=allCalendarPlans.find(item=>item.id===button.dataset.calendarPlan);if(plan)openSavedPlan(plan);}));
+  $('#calendarBoard').querySelectorAll('[data-calendar-class]').forEach(button=>button.addEventListener('click',()=>{const form=$('#planForm');form.reset();form.elements.lesson_date.value=button.dataset.calendarClass;form.elements.subject.value=button.dataset.subject;form.elements.grade.value=button.dataset.grade;form.elements.duration_minutes.value=button.dataset.duration;$('#planPreview').innerHTML='';currentPlanId=null;showPage('crear');}));
 }
 
 $('#profileForm').addEventListener('submit', async event => {
   event.preventDefault(); setStatus('#profileStatus','Guardando perfil…');
-  const data = Object.fromEntries(new FormData(event.currentTarget).entries());
-  data.first_name = data.first_name.trim(); data.last_name = data.last_name.trim(); data.full_name = [data.first_name,data.last_name].filter(Boolean).join(' '); data.updated_at = new Date().toISOString();
-  const { error } = await supabase.from('teacher_profiles').upsert({ id:currentUser.id, ...data });
-  if (error) setStatus('#profileStatus', friendlyError(error), 'error');
-  else { if (data.primary_grade) $('#planForm').elements.grade.value = data.primary_grade; $('#welcomeTitle').textContent = `¡Hola, ${data.first_name}!`; setStatus('#profileStatus','Perfil guardado.','ok'); }
+  try { await saveTeacherProfile(event.currentTarget,false); setStatus('#profileStatus','Perfil guardado.','ok'); }
+  catch(error) { setStatus('#profileStatus',friendlyError(error),'error'); }
 });
 async function loadProfile() {
-  const { data,error } = await supabase.from('teacher_profiles').select('*').eq('id',currentUser.id).maybeSingle();
-  if (error) { setStatus('#profileStatus',friendlyError(error),'error'); return; }
-  if (data) for (const [key,value] of Object.entries(data)) if ($('#profileForm').elements[key]) $('#profileForm').elements[key].value = value || '';
+  const {data,error}=await supabase.from('teacher_profiles').select('*').eq('id',currentUser.id).maybeSingle();
+  if(error){setStatus('#profileStatus',friendlyError(error),'error');return;}
+  if(data){currentProfile=data;fillTeacherForm($('#profileForm'),data);}
 }
 
+function localDateFromKey(value) { const [year,month,day]=value.split('-').map(Number); return new Date(year,month-1,day,12); }
+function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`; }
+function samePlan(plan,date,subject,grade) { return plan.lesson_date===date && plan.subject.toLocaleLowerCase()===subject.toLocaleLowerCase() && String(plan.grade).toLocaleLowerCase()===String(grade).toLocaleLowerCase(); }
 async function loadHome() {
-  const [{ data:plans,error:plansError },{ data:schedule,error:scheduleError }] = await Promise.all([
+  const [{data:plans,error:plansError},{data:schedule,error:scheduleError}]=await Promise.all([
     supabase.from('lesson_plans').select('id,subject,grade,topic,lesson_date').order('lesson_date',{ascending:true}),
-    supabase.from('class_schedules').select('id,weekday,start_time,subject,grade,section,duration_minutes').order('weekday').order('start_time')
+    supabase.from('class_schedules').select('id,weekday,start_time,subject,grade,section,duration_minutes').order('weekday').order('start_time'),
   ]);
-  if (plansError || scheduleError) {
-    $('#homeSchedule').innerHTML = `<div class="empty">${escapeHtml(friendlyError(plansError || scheduleError))}</div>`; return;
-  }
-  const currentMonth = localISODate().slice(0,7);
-  $('#statPlans').textContent = plans?.length || 0; $('#statMonth').textContent = plans?.filter(p=>p.lesson_date.startsWith(currentMonth)).length || 0; $('#statClasses').textContent = schedule?.length || 0;
-  if (!schedule?.length) { $('#homeSchedule').innerHTML = '<div class="empty">Cargá tu horario semanal para ver aquí tus próximas clases.</div>'; return; }
-  const today = new Date().getDay();
-  const orderedDays = [...schedule].sort((a,b) => ((a.weekday - (today || 7) + 7)%7) - ((b.weekday - (today || 7) + 7)%7) || (a.start_time||'').localeCompare(b.start_time||''));
-  $('#homeSchedule').innerHTML = orderedDays.slice(0,5).map(item=>`<article class="item"><div class="row"><span class="pill">${weekdays[item.weekday]}</span><b>${escapeHtml((item.start_time||'').slice(0,5))}</b><span>${escapeHtml(item.subject)} · ${escapeHtml(item.grade)}${item.section?` · ${escapeHtml(item.section)}`:''}</span><span class="muted">${escapeHtml(item.duration_minutes)} min</span></div></article>`).join('');
+  if(plansError||scheduleError){$('#homeSchedule').innerHTML=`<div class="empty">${escapeHtml(friendlyError(plansError||scheduleError))}</div>`;return;}
+  const {data:holidays}=await supabase.from('calendar_events').select('start_date,end_date').eq('event_type','feriado');
+  const nonSchoolDays=holidays||[];
+  const currentMonth=localISODate().slice(0,7);
+  $('#statPlans').textContent=plans?.length||0;$('#statMonth').textContent=plans?.filter(p=>p.lesson_date.startsWith(currentMonth)).length||0;$('#statClasses').textContent=schedule?.length||0;
+  if(!schedule?.length){$('#homeSchedule').innerHTML='<div class="empty">Configurá tu horario para visualizar aquí la agenda de clases.</div>';$('#planningAlerts').innerHTML='<div class="empty">Agregá primero tu horario semanal para recibir alertas de planificación.</div>';return;}
+  const today=new Date(); today.setHours(12,0,0,0); const upcoming=[]; const classDates=[];
+  for(let offset=0;offset<15&&classDates.length<7;offset++) { const date=new Date(today);date.setDate(today.getDate()+offset); const weekday=date.getDay();if(weekday<1||weekday>5)continue;const dayKey=dateKey(date);if(nonSchoolDays.some(event=>event.start_date<=dayKey&&(event.end_date||event.start_date)>=dayKey))continue;for(const item of schedule.filter(x=>x.weekday===weekday))classDates.push({date,item}); }
+  const classes=classDates.slice(0,6);
+  $('#homeSchedule').innerHTML=classes.map(({date,item})=>`<article class="item"><div class="row"><span class="pill">${escapeHtml(date.toLocaleDateString('es-NI',{weekday:'long',day:'numeric',month:'short'}))}</span><b>${escapeHtml((item.start_time||'').slice(0,5))}</b><span>${escapeHtml(item.subject)} · ${escapeHtml(item.grade)}${item.section?` · ${escapeHtml(item.section)}`:''}</span><span class="muted">${escapeHtml(item.duration_minutes)} min</span></div></article>`).join('');
+  for(const {date,item} of classDates){const key=dateKey(date);if(!plans.some(plan=>samePlan(plan,key,item.subject,item.grade)))upcoming.push({date,key,item});}
+  const alerts=upcoming.slice(0,5);
+  $('#planningAlerts').innerHTML=alerts.length?alerts.map(({date,key,item})=>`<article class="item"><div class="row"><span class="pill">Por planear</span><b>${escapeHtml(date.toLocaleDateString('es-NI',{weekday:'short',day:'numeric',month:'short'}))}</b><span>${escapeHtml(item.subject)} · ${escapeHtml(item.grade)}</span><button class="blue" data-plan-class="${escapeHtml(key)}" data-subject="${escapeHtml(item.subject)}" data-grade="${escapeHtml(item.grade)}" data-duration="${item.duration_minutes}">Crear plan</button></div></article>`).join(''):'<div class="empty">¡Bien! Las próximas clases ya tienen un plan guardado.</div>';
+  $('#planningAlerts').querySelectorAll('[data-plan-class]').forEach(button=>button.addEventListener('click',()=>{const form=$('#planForm');form.reset();form.elements.lesson_date.value=button.dataset.planClass;form.elements.subject.value=button.dataset.subject;form.elements.grade.value=button.dataset.grade;form.elements.duration_minutes.value=button.dataset.duration;$('#planPreview').innerHTML='';currentPlanId=null;showPage('crear');}));
 }
 
 let recoveringPassword = false;
