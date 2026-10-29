@@ -750,13 +750,13 @@ $('#planForm').elements.lesson_date.addEventListener('change', async event => {
   const { data } = await supabase.from('class_schedules').select('subject,grade,duration_minutes').eq('weekday',weekday).order('start_time');
   if (!data?.length) return;
   const form = $('#planForm');
-  const selected = data.find(item => item.subject === form.elements.subject.value) || data[0];
-  if (!form.elements.subject.value) {
+  const selected = form.elements.subject.value ? data.find(item => item.subject === form.elements.subject.value) : data[0];
+  if (selected && !form.elements.subject.value) {
     setPlanSubject(selected.subject);
   }
-  planningGradeOverride = selected.grade || currentProfile?.primary_grade || '';
+  planningGradeOverride = selected?.grade || currentProfile?.primary_grade || '';
   updatePlanAgeHint(currentProfile);
-  if (!form.elements.duration_minutes.value || form.elements.duration_minutes.value === '45') form.elements.duration_minutes.value = selected.duration_minutes;
+  if (selected && (!form.elements.duration_minutes.value || form.elements.duration_minutes.value === '45')) form.elements.duration_minutes.value = selected.duration_minutes;
 });
 window.syllaboAppReady = true;
 if (recoveringPassword) showRecoveryForm();
