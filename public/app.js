@@ -242,6 +242,16 @@ function friendlyError(error) {
   if (/row-level security|permission denied/i.test(message)) return 'Tu sesión no tiene permiso para esta acción. Cerrá sesión y volvé a ingresar.';
   return message;
 }
+async function functionErrorMessage(error) {
+  try {
+    const response = error?.context;
+    if (response?.clone) {
+      const body = await response.clone().json();
+      if (body?.error) return String(body.error);
+    }
+  } catch {}
+  return friendlyError(error);
+}
 
 function setAuthMode(signup) {
   isSignup = signup;
@@ -555,7 +565,7 @@ $('#generatePlan').addEventListener('click', async () => {
     setStatus('#planStatus', 'La propuesta con IA está lista. Revisá y ajustá el plan antes de guardarlo.', 'ok');
     currentPlanId = null;
   } catch (err) {
-    const reason = friendlyError(err);
+    const reason = await functionErrorMessage(err);
     try {
       const teacher = await ensureProfile();
       const data = { ...pendingPlanData, grade:planningGradeOverride || teacher.primary_grade || '' };
