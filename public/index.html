@@ -166,6 +166,7 @@ input:focus,select:focus,textarea:focus{background:#fff;border-color:#7391e7;box
  #app footer{padding-bottom:calc(120px + env(safe-area-inset-bottom))}
 }
 @media print{#app .nav{display:none!important}}
+.worksheet-section li{white-space:pre-line;line-height:1.6;margin-bottom:18px}@media print{.checklist-table{break-inside:avoid-page}.worksheet-section li{break-inside:avoid-page}}
 </style>
 <link rel="manifest" href="./manifest.webmanifest"><link rel="stylesheet" href="./mobile.css"></head>
 <body>
@@ -210,8 +211,8 @@ input:focus,select:focus,textarea:focus{background:#fff;border-color:#7391e7;box
   <aside class="device-access"><p id="connectionStatus" role="status">Guardá tus PDF para consultarlos sin internet.</p><button type="button" class="soft-btn" data-open-offline>Mis PDF sin internet</button></aside>
   <section id="offlinePanel" hidden aria-labelledby="offlineTitle"><div class="offline-inner"><button type="button" id="closeOffline" class="soft-btn">← Volver</button><h1 id="offlineTitle">Mis PDF sin internet</h1><p>Copias guardadas en este teléfono. Se pueden abrir sin iniciar sesión. Si compartís el dispositivo, quitá las copias al terminar. Borrar los datos del navegador elimina estas copias; conservá también la descarga.</p><p id="offlineStatus" role="status"></p><div id="offlineList"></div><button type="button" id="clearOffline" class="text-btn">Quitar todas las copias del teléfono</button></div></section>
   <script type="module" src="./offline.js"></script>
-  <script src="./ui.js?v=20261029-mobile-pdf-2"></script>
-  <script type="module" src="./app.js?v=20261029-mobile-pdf-2"></script>
+  <script src="./ui.js?v=20261029-enriched-v1"></script>
+  <script type="module" src="./app.js?v=20261029-enriched-v1"></script>
 </body></html>
 
 

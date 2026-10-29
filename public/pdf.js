@@ -47,7 +47,7 @@ export function createPlanPDF(text) {
     for(const original of lines){
       const value=original.trim();if(!value){y+=4;continue;}
       if(/^FICHA Y EVALUACI[OÓ]N$/i.test(value)){newPage();documentTitle('Ficha de trabajo');continue;}
-      if(/^(INDICADOR DE LOGRO|RECURSOS Y PREPARACI[OÓ]N|RESPUESTAS ORIENTATIVAS Y APOYO)$/i.test(value)||/^(?:\d+[.)]\s*)?(Inicio|Desarrollo|Cierre)\s*\|/i.test(value)){heading(value.replace(/^[A-ZÁÉÍÓÚÑ ]+$/,s=>s.charAt(0)+s.slice(1).toLowerCase()));continue;}
+      if(/^(INDICADOR DE LOGRO|RECURSOS Y PREPARACI[OÓ]N|RESPUESTAS ORIENTATIVAS Y APOYO|GUÍA CONCEPTUAL PARA EL DOCENTE|EJEMPLOS RESUELTOS|GLOSARIO DOCENTE|RETO OPCIONAL DE AMPLIACIÓN)$/i.test(value)||/^(?:\d+[.)]\s*)?(Inicio|Desarrollo|Cierre)\s*\|/i.test(value)){heading(value.replace(/^[A-ZÁÉÍÓÚÑ ]+$/,s=>s.charAt(0)+s.slice(1).toLowerCase()));continue;}
       const isMeta=/^(Docente:|Fecha:|Nombre:)/i.test(value);
       paragraph(value,{size:isMeta?9.5:10.4,font:isMeta?'F2':'F1',color:isMeta?muted:ink});
       if(worksheetAt>=0&&/^\d+[.)]\s/.test(value)){ensure(42);rule(y+18);y+=36;}
