@@ -40,8 +40,8 @@ async function openApp(user) {
   try { const profile = await ensureProfile(); if (profile.primary_grade) $('#planForm').elements.grade.value = profile.primary_grade; }
   catch (err) { setStatus('#planStatus', `No se pudo cargar el perfil: ${err.message}`, 'error'); }
 }
-$('#toggleAuth').addEventListener('click', () => {
-  isSignup = !isSignup;
+function setAuthMode(signup) {
+  isSignup = signup;
   $('#authTitle').textContent = isSignup ? 'Crear cuenta docente' : 'Ingresar';
   $('#authSubmit').textContent = isSignup ? 'Crear cuenta' : 'Ingresar';
   $('#toggleAuth').textContent = isSignup ? 'Ya tengo cuenta' : 'Crear cuenta';
@@ -49,7 +49,12 @@ $('#toggleAuth').addEventListener('click', () => {
   $('#authForm').elements.first_name.required = isSignup;
   $('#authForm').elements.last_name.required = isSignup;
   $('#authForm').elements.password.autocomplete = isSignup ? 'new-password' : 'current-password';
-});
+  try { sessionStorage.setItem('syllabo_auth_mode', isSignup ? 'signup' : 'login'); } catch {}
+}
+let savedAuthMode = 'login';
+try { savedAuthMode = sessionStorage.getItem('syllabo_auth_mode') || 'login'; } catch {}
+setAuthMode(savedAuthMode === 'signup');
+$('#toggleAuth').addEventListener('click', () => setAuthMode(!isSignup));
 $('#authForm').addEventListener('submit', async (event) => {
   event.preventDefault(); setStatus('#authStatus', 'Procesando…');
   const form = new FormData(event.currentTarget); const email = form.get('email'); const password = form.get('password');
@@ -65,11 +70,12 @@ $('#authForm').addEventListener('submit', async (event) => {
     } else {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      setAuthMode(false);
       await openApp(data.user);
     }
   } catch (err) { setStatus('#authStatus', err.message || 'No se pudo completar el acceso.', 'error'); }
 });
-$('#logout').addEventListener('click', async () => { await supabase.auth.signOut(); currentUser = null; $('#app').classList.add('hidden'); $('#auth').classList.remove('hidden'); setStatus('#authStatus', 'Sesión cerrada.'); });
+$('#logout').addEventListener('click', async () => { await supabase.auth.signOut(); currentUser = null; setAuthMode(false); $('#app').classList.add('hidden'); $('#auth').classList.remove('hidden'); setStatus('#authStatus', 'Sesión cerrada.'); });
 document.querySelectorAll('.tab').forEach(button => button.addEventListener('click', () => showPage(button.dataset.page)));
 
 function makePlanBody(data, teacher) {
