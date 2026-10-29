@@ -6,6 +6,21 @@
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   };
+  const updateGradeOptions = (form) => {
+    const modality = form.elements.modality?.value;
+    const field = form.elements.primary_grade;
+    if (!field || !modality) return;
+    const first = modality === 'secundaria' ? 7 : 1;
+    const last = modality === 'secundaria' ? 11 : 6;
+    const options = Array.from({ length: last - first + 1 }, (_, index) => `${first + index}° grado`);
+    const selected = field.value;
+    field.innerHTML = `<option value="">Seleccioná el grado</option>${options.map(value => `<option value="${value}">${value}</option>`).join('')}<option value="Multigrado">Multigrado</option>`;
+    field.value = [...options, 'Multigrado'].includes(selected) ? selected : '';
+  };
+  ['onboardingForm', 'profileForm'].forEach((id) => {
+    const form = $(`#${id}`);
+    form?.elements.modality?.addEventListener('change', () => updateGradeOptions(form));
+  });
 
   document.querySelectorAll('[data-password-toggle]').forEach((button) => {
     button.addEventListener('click', () => {
