@@ -19,7 +19,7 @@ Asistente de planificación docente con ficha de bienvenida, perfil, agenda sema
 - Calendario con vistas de mes, semana y día; reúne clases, planes y actividades, festivales y feriados creados por el docente. Los feriados registrados omiten las clases recurrentes y las alertas de planificación de esas fechas.
 - Horario de lunes a viernes, con varias clases por día.
 - Sugerencia de asignatura, grado y duración del horario al escoger fecha del plan.
-- Generación local de un borrador guiado sin enviar la información de la clase a un proveedor de IA.
+- Generación de planes con OpenAI desde una función segura de Supabase Edge Functions. El docente puede incluir una sugerencia u observación opcional que la IA considera al proponer actividades, evaluación, ficha y apoyos; la observación se guarda en `lesson_plans.plan_body` junto al plan.
 - Plan con indicador, contenido, propósito, recursos y preparación; inicio, desarrollo y cierre con minutos que suman exactamente la duración; ficha de trabajo, lista de cotejo y respuestas orientativas/apoyos. La distribución de secciones sigue la plantilla compartida por la docente.
 - Edición, guardado, búsqueda, apertura, eliminación e impresión del plan a PDF.
 - Datos aislados por cuenta con Row Level Security (RLS).
@@ -69,8 +69,10 @@ La aplicación presenta la selección de materias con el nombre pedagógico del 
 
 Se pueden añadir asignaturas propias del centro, modalidad o programa del docente.
 
-## IA externa
+## Generación con IA
 
-La app actualmente prepara el borrador guiado y criterios sugeridos dentro del navegador, sin mandar el contenido de las clases a un servicio externo. El endpoint de IA incluido en `supabase/functions/generate-lesson-plan/` todavía no está desplegado. Para activar generación con IA primero hay que decidir qué proveedor se usará, autorizar el envío de los datos necesarios y definir el límite de gasto; una clave de OpenAI puede generar cargos y no se paga automáticamente con créditos de AWS.
+La función `generate-lesson-plan` llama a OpenAI desde Supabase; la clave del proveedor nunca se incluye en el navegador ni en el repositorio. Para activarla en un proyecto propio, configurá `OPENAI_API_KEY` en Supabase → Edge Functions → Secrets. Opcionalmente, configurá `OPENAI_MODEL`; por defecto usa `gpt-4.1-mini`. No hay que desactivar `verify_jwt`: la función requiere una sesión válida del docente. Si falta la clave o el proveedor no responde, Syllabo informa que no logró conectar con IA y deja disponible un borrador guiado claramente identificado.
+
+Asignatura, modalidad, grado, fecha, contenido, indicador, observación opcional, rango de edad, recursos y preferencias pedagógicas se envían a OpenAI para generar la propuesta. El nombre y la escuela se agregan localmente después de recibir la respuesta y no se envían. El uso de OpenAI API puede generar cargos en la cuenta del proveedor según los tokens consumidos; establecé límites de uso y presupuesto en OpenAI antes de ofrecer la función a muchas personas.
 
 La migración de onboarding y calendario ya se aplicó al proyecto Supabase conectado. Para otra instancia, aplicá las migraciones en `supabase/migrations/` en orden.

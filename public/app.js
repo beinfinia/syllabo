@@ -34,6 +34,7 @@ let isSignup = false;
 let currentPlanId = null;
 let generatedPlanText = '';
 let generatedPlanData = null;
+let generatedPlanSource = 'guided';
 let allPlans = [];
 
 let currentProfile = null;
@@ -333,6 +334,7 @@ function plainPlanText(plan) {
     '', 'INDICADOR DE LOGRO', plan.achievement_indicator || '',
     `Contenido: ${plan.content || ''}`,
     `Propósito: ${plan.objective || `Trabajar ${plan.content || 'el contenido'} y avanzar hacia el indicador de logro.`}`,
+    ...(plan.additional_observation ? [`Observación del docente considerada: ${plan.additional_observation}`] : []),
     '', 'RECURSOS Y PREPARACIÓN', plan.preparation || plan.resources || 'Preparar pizarra, cuaderno y ejemplos del entorno.'
   ];
   for (const activity of splitActivities(plan)) {
@@ -478,6 +480,7 @@ function getPlanFormData() {
   data.topic = derivePlanTitle(data.content);
   data.resources = planResourcesOverride ?? formatResourceList(currentProfile?.teacher_context?.available_resources);
   data.evaluation_criteria = suggestEvaluationCriteria(data);
+  data.additional_observation = String(data.additional_observation || '').trim();
   return data;
 }
 function formHasRequiredData(data) {
@@ -500,8 +503,9 @@ function reviewPlan(event) {
     ['Edad del grupo', profile.teacher_context?.student_age_range || 'No indicada'],
     ['Fecha', prettyDate(data.lesson_date)], ['Duración', `${data.duration_minutes} minutos`],
     ['Contenido', data.content], ['Indicador de logro', data.achievement_indicator],
+    ['Sugerencia u observación', data.additional_observation || 'Ninguna'],
     ['Recursos del perfil', data.resources || 'Sin recursos marcados; se sugerirán materiales básicos.'],
-    ['Criterios de evaluación', 'Se propondrán automáticamente dentro del borrador.']
+    ['Criterios de evaluación', 'La IA los propondrá a partir del indicador.']
   ];
   $('#planReviewDetails').innerHTML = summary.map(([label, value]) => `<div><b>${escapeHtml(label)}:</b> ${escapeHtml(value)}</div>`).join('');
   $('#planForm').classList.add('hidden');
@@ -514,22 +518,62 @@ $('#editPlanDetails').addEventListener('click', () => { $('#planReview').classLi
 $('#generatePlan').addEventListener('click', async () => {
   if (!pendingPlanData) return;
   const button = $('#generatePlan'); button.disabled = true;
-  $('#aiState').innerHTML = '<span class="progress"><span></span></span> Preparando el borrador en este dispositivo…';
-  setStatus('#planStatus', 'Armando la secuencia de clase…');
+  $('#aiState').innerHTML = '<span class="progress"><span></span></span> Generando el plan con IA…';
+  setStatus('#planStatus', 'Enviando los datos del plan a la IA…');
   try {
     const teacher = await ensureProfile();
     const data = { ...pendingPlanData, grade:planningGradeOverride || teacher.primary_grade || '' };
     if (!data.grade) throw new Error('Seleccioná el grado en Mi perfil para continuar.');
     data.evaluation_criteria = suggestEvaluationCriteria(data);
-    const result = { plan:localDraft(data, teacher), source:'guided' };
+    const { data: response, error } = await supabase.functions.invoke('generate-lesson-plan', {
+      body: {
+        ...data,
+        modality: teacher.modality || '',
+        student_age_range: teacher.teacher_context?.student_age_range || '',
+        available_resources: teacher.teacher_context?.available_resources || [],
+        planning_challenges: teacher.teacher_context?.planning_challenges || '',
+        preferred_dynamics: teacher.teacher_context?.preferred_dynamics || '',
+        internet_access: teacher.teacher_context?.internet_access || ''
+      }
+    });
+    if (error) throw error;
+    if (!response?.plan) throw new Error(response?.error || 'La IA no devolvió un plan. Intentá de nuevo.');
+    const aiPlan = {
+      ...response.plan,
+      teacher: [teacher.first_name, teacher.last_name].filter(Boolean).join(' '),
+      school: teacher.school_name || '',
+      student_age_range: teacher.teacher_context?.student_age_range || '',
+      additional_observation: data.additional_observation
+    };
+    const result = { plan:aiPlan, source:'ai' };
+    generatedPlanSource = 'ai';
     generatedPlanText = result.plan.text;
     generatedPlanData = result.plan;
     $('#planReview').classList.add('hidden'); $('#planForm').classList.remove('hidden');
     renderPlanPreview(result.plan, result.source);
-    $('#aiState').textContent = 'Criterios y actividades propuestos automáticamente en este dispositivo; el contenido no se envió a un servicio externo.';
-    setStatus('#planStatus', 'El borrador está listo. Revisá y ajustá la propuesta antes de guardarla.', 'ok');
+    $('#aiState').textContent = 'Plan generado con IA. Revisá y ajustá la propuesta antes de guardarla.';
+    setStatus('#planStatus', 'La propuesta con IA está lista. Revisá y ajustá el plan antes de guardarlo.', 'ok');
     currentPlanId = null;
-  } catch (err) { setStatus('#planStatus', friendlyError(err), 'error'); $('#aiState').textContent = 'No se pudo generar la propuesta.'; $('#planReview').classList.remove('hidden'); $('#planForm').classList.add('hidden'); }
+  } catch (err) {
+    const reason = friendlyError(err);
+    try {
+      const teacher = await ensureProfile();
+      const data = { ...pendingPlanData, grade:planningGradeOverride || teacher.primary_grade || '' };
+      data.evaluation_criteria = suggestEvaluationCriteria(data);
+      const fallback = localDraft(data, teacher);
+      fallback.additional_observation = data.additional_observation;
+      generatedPlanSource = 'guided'; generatedPlanText = fallback.text; generatedPlanData = fallback;
+      $('#planReview').classList.add('hidden'); $('#planForm').classList.remove('hidden');
+      renderPlanPreview(fallback, 'guided');
+      $('#aiState').textContent = 'Borrador guiado: no se pudo conectar con la IA.';
+      setStatus('#planStatus', `La IA no respondió (${reason}). Dejé listo un borrador guiado; revisá la conexión de IA antes de volver a intentar.`, 'error');
+      currentPlanId = null;
+    } catch (fallbackError) {
+      setStatus('#planStatus', `${reason} ${friendlyError(fallbackError)}`, 'error');
+      $('#aiState').textContent = 'No se pudo generar la propuesta.';
+      $('#planReview').classList.remove('hidden'); $('#planForm').classList.add('hidden');
+    }
+  }
   finally { button.disabled = false; }
 });
 function renderPlanPreview(plan, source = 'guided') {
@@ -541,7 +585,7 @@ function renderPlanPreview(plan, source = 'guided') {
   const worksheet=plan.worksheet||buildWorksheet(plan);
   const activities=splitActivities(plan).map(item=>`<article class="activity"><h3>${escapeHtml(item.moment||'Actividad')} · ${escapeHtml(item.minutes||0)} min</h3>${Array.isArray(item.steps)&&item.steps.length?item.steps.map(step=>`<p><b>${escapeHtml(step.label||'Actividad')} (${escapeHtml(step.minutes||0)} min):</b> ${escapeHtml(step.detail||'')}</p>`).join(''):`<p>${escapeHtml(item.activity||'')}</p>${item.examples?`<p><b>Ejemplo:</b> ${escapeHtml(item.examples)}</p>`:''}${item.assessment?`<p><b>Observación:</b> ${escapeHtml(item.assessment)}</p>`:''}`}</article>`).join('');
   const checkRows=checklist.map(item=>`<tr><td>${escapeHtml(item)}</td><td>____</td><td>____</td></tr>`).join('');
-  $('#planPreview').innerHTML=`<div class="plan-paper"><pre id="printBody" class="print-body"></pre><div id="printStructured" class="print-structured"><div class="plan-heading"><div class="brand" style="justify-content:center;font-size:17px"><img class="mark" src="./logo.svg" alt="">Syllabo</div><p class="eyebrow" style="margin:8px 0 3px">Planificación didáctica</p><h2>Plan de clase | ${escapeHtml(plan.subject||'')}</h2>${badge}</div><div class="plan-meta"><div><b>Docente:</b> ${escapeHtml(plan.teacher||'')}</div><div><b>Grado:</b> ${escapeHtml(plan.grade||'')}</div><div><b>Fecha:</b> ${escapeHtml(prettyDate(plan.lesson_date)||'')}</div><div><b>Duración:</b> ${escapeHtml(plan.duration_minutes||'')} minutos</div>${plan.school?`<div><b>Centro educativo:</b> ${escapeHtml(plan.school)}</div>`:''}${plan.student_age_range?`<div><b>Edad de referencia:</b> ${escapeHtml(plan.student_age_range)}</div>`:''}</div><section class="plan-block"><h3>Indicador de logro</h3><p>${escapeHtml(plan.achievement_indicator||'')}</p><p><b>Contenido:</b> ${escapeHtml(plan.content||'')}</p><p><b>Propósito:</b> ${escapeHtml(plan.objective||'')}</p></section><section class="plan-block"><h3>Recursos y preparación</h3><p>${escapeHtml(plan.preparation||plan.resources||'Preparar pizarra, cuaderno y ejemplos del entorno.')}</p></section><section class="plan-block"><h3>Secuencia didáctica</h3>${activities}</section><section class="plan-block worksheet-section"><h3>Ficha y evaluación</h3><p>Nombre: ____________________________________ &nbsp; Fecha: __________________</p><p>${escapeHtml(worksheet.instructions||'Resuelve las actividades y explica tus respuestas.')}</p><ol>${(worksheet.tasks||[]).map(task=>`<li>${escapeHtml(task)}<p class="answer-lines">________________________________________________________________________</p></li>`).join('')}</ol><h3>Lista de cotejo para la docente</h3><table class="checklist-table"><thead><tr><th>Criterio observable</th><th>Sí</th><th>En proceso</th></tr></thead><tbody>${checkRows}</tbody></table></section><section class="plan-block"><h3>Respuestas orientativas y apoyo</h3><p>${escapeHtml(plan.answer_guide||'Las respuestas pueden variar; revisar que se relacionen con el contenido y el indicador.')}</p><p><b>Adecuación:</b> ${escapeHtml(plan.differentiation||'Dar instrucciones paso a paso, ofrecer apoyo visual y permitir responder oralmente o por escrito.')}</p>${plan.teacher_note?`<p><b>Nota docente:</b> ${escapeHtml(plan.teacher_note)}</p>`:''}</section></div><section class="plan-block editor-block"><h3>Editar el plan</h3><textarea id="planEditor" aria-label="Editar plan de clase">${escapeHtml(text)}</textarea><p class="muted">Revisá y ajustá la propuesta antes de guardarla o imprimirla.</p></section><div class="row noprint"><button id="savePlan" class="primary">${currentPlanId?'Guardar cambios':'Guardar en mis planes'}</button><button id="printPlan" class="soft-btn">Imprimir / Guardar PDF</button><button id="discardPlan" class="text-btn">Cerrar</button></div><div id="saveStatus" class="status" aria-live="polite"></div></div>`;
+  $('#planPreview').innerHTML=`<div class="plan-paper"><pre id="printBody" class="print-body"></pre><div id="printStructured" class="print-structured"><div class="plan-heading"><div class="brand" style="justify-content:center;font-size:17px"><img class="mark" src="./logo.svg" alt="">Syllabo</div><p class="eyebrow" style="margin:8px 0 3px">Planificación didáctica</p><h2>Plan de clase | ${escapeHtml(plan.subject||'')}</h2>${badge}</div><div class="plan-meta"><div><b>Docente:</b> ${escapeHtml(plan.teacher||'')}</div><div><b>Grado:</b> ${escapeHtml(plan.grade||'')}</div><div><b>Fecha:</b> ${escapeHtml(prettyDate(plan.lesson_date)||'')}</div><div><b>Duración:</b> ${escapeHtml(plan.duration_minutes||'')} minutos</div>${plan.school?`<div><b>Centro educativo:</b> ${escapeHtml(plan.school)}</div>`:''}${plan.student_age_range?`<div><b>Edad de referencia:</b> ${escapeHtml(plan.student_age_range)}</div>`:''}</div><section class="plan-block"><h3>Indicador de logro</h3><p>${escapeHtml(plan.achievement_indicator||'')}</p><p><b>Contenido:</b> ${escapeHtml(plan.content||'')}</p><p><b>Propósito:</b> ${escapeHtml(plan.objective||'')}</p>${plan.additional_observation?`<p><b>Observación del docente considerada:</b> ${escapeHtml(plan.additional_observation)}</p>`:''}</section><section class="plan-block"><h3>Recursos y preparación</h3><p>${escapeHtml(plan.preparation||plan.resources||'Preparar pizarra, cuaderno y ejemplos del entorno.')}</p></section><section class="plan-block"><h3>Secuencia didáctica</h3>${activities}</section><section class="plan-block worksheet-section"><h3>Ficha y evaluación</h3><p>Nombre: ____________________________________ &nbsp; Fecha: __________________</p><p>${escapeHtml(worksheet.instructions||'Resuelve las actividades y explica tus respuestas.')}</p><ol>${(worksheet.tasks||[]).map(task=>`<li>${escapeHtml(task)}<p class="answer-lines">________________________________________________________________________</p></li>`).join('')}</ol><h3>Lista de cotejo para la docente</h3><table class="checklist-table"><thead><tr><th>Criterio observable</th><th>Sí</th><th>En proceso</th></tr></thead><tbody>${checkRows}</tbody></table></section><section class="plan-block"><h3>Respuestas orientativas y apoyo</h3><p>${escapeHtml(plan.answer_guide||'Las respuestas pueden variar; revisar que se relacionen con el contenido y el indicador.')}</p><p><b>Adecuación:</b> ${escapeHtml(plan.differentiation||'Dar instrucciones paso a paso, ofrecer apoyo visual y permitir responder oralmente o por escrito.')}</p>${plan.teacher_note?`<p><b>Nota docente:</b> ${escapeHtml(plan.teacher_note)}</p>`:''}</section></div><section class="plan-block editor-block"><h3>Editar el plan</h3><textarea id="planEditor" aria-label="Editar plan de clase">${escapeHtml(text)}</textarea><p class="muted">Revisá y ajustá la propuesta antes de guardarla o imprimirla.</p></section><div class="row noprint"><button id="savePlan" class="primary">${currentPlanId?'Guardar cambios':'Guardar en mis planes'}</button><button id="printPlan" class="soft-btn">Imprimir / Guardar PDF</button><button id="discardPlan" class="text-btn">Cerrar</button></div><div id="saveStatus" class="status" aria-live="polite"></div></div>`;
   $('#planEditor').addEventListener('input',event=>{generatedPlanText=event.target.value;});
   $('#savePlan').addEventListener('click',saveCurrentPlan);
   $('#printPlan').addEventListener('click',()=>{generatedPlanText=$('#planEditor').value;const paper=$('#planPreview .plan-paper');const edited=generatedPlanText.trim()!==structuredText.trim();paper.classList.toggle('print-text-only',edited);$('#printBody').textContent=generatedPlanText;window.print();paper.classList.remove('print-text-only');});
@@ -552,7 +596,8 @@ async function saveCurrentPlan() {
   data.evaluation_criteria = generatedPlanData?.evaluation_criteria || suggestEvaluationCriteria(data);
   const editor = $('#planEditor');
   if (editor) generatedPlanText = editor.value;
-  const row = { ...data, plan_body:{ text:generatedPlanText, plan:generatedPlanData, source:$('#aiState').textContent.startsWith('Borrador guiado') ? 'guided' : 'ai' }, updated_at:new Date().toISOString() };
+  const { additional_observation, ...lessonColumns } = data;
+  const row = { ...lessonColumns, plan_body:{ text:generatedPlanText, plan:generatedPlanData, source:generatedPlanSource, additional_observation }, updated_at:new Date().toISOString() };
   setStatus('#saveStatus', 'Guardando…'); $('#savePlan').disabled = true;
   try {
     let query = supabase.from('lesson_plans');
@@ -572,7 +617,7 @@ function startPlanFromClass({ date = localISODate(), subject = '', grade = '', d
   if (subject) setPlanSubject(subject);
   updatePlanAgeHint(currentProfile);
   form.classList.remove('hidden'); $('#planReview').classList.add('hidden');
-  $('#planPreview').innerHTML = ''; $('#aiState').textContent = 'Se prepara un borrador editable.'; setStatus('#planStatus');
+  $('#planPreview').innerHTML = ''; $('#aiState').textContent = 'Se generará una propuesta con IA.'; generatedPlanSource='guided'; setStatus('#planStatus');
   currentPlanId = null; generatedPlanText = ''; generatedPlanData = null; pendingPlanData = null;
 }
 $('#newPlan').addEventListener('click', () => startPlanFromClass());
@@ -614,6 +659,8 @@ async function openSavedPlan(plan) {
   const profile = await ensureProfile();
   const body = plan.plan_body || {};
   const draft = body.plan || null;
+  form.elements.additional_observation.value = body.additional_observation || draft?.additional_observation || '';
+  generatedPlanSource = body.source || 'guided';
   const text = body.text || (draft ? plainPlanText(draft) : '');
   if (draft) { draft.text = text; generatedPlanData = draft; renderPlanPreview(draft, body.source || 'guided'); }
   else {
