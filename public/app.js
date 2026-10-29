@@ -111,54 +111,10 @@ async function openApp(user) {
     initializedUserId = user.id; openingUserId = null;
   } catch (err) { openingUserId = null; $('#app').classList.add('hidden'); $('#onboarding').classList.add('hidden'); document.body.classList.remove('onboarding-open'); $('#auth').classList.remove('hidden'); setStatus('#authStatus', `No se pudo cargar tu perfil: ${friendlyError(err)}`, 'error'); }
 }
-const subjectCatalog = {
-  primary: [
-    'Creciendo en Valores','Derecho y Dignidad de las Mujeres','Educación para Aprender, Emprender, Prosperar',
-    'Estudios Sociales (Historia y Geografía)','Educación Física y Práctica Deportiva','Lengua y Literatura',
-    'Lengua Extranjera (Inglés)','Talleres de Arte y Cultura','Matemática',
-    'Ciencias Naturales (Ciencias de la Vida y el Ambiente)','Conociendo mi Mundo'
-  ],
-  secondary: [
-    'Creciendo en Valores','Derechos y Dignidad de las Mujeres','Educación Física y Práctica Deportiva',
-    'Educación para Aprender, Emprender, Prosperar','Ciencias Sociales (Geografía)','Ciencias Sociales (Historia)',
-    'Ciencias Sociales (Economía)','Ciencias Sociales (Sociología)','Ciencias Sociales (Filosofía)',
-    'Lengua y Literatura','Lengua Extranjera (Inglés y Francés)','Talleres de Arte y Cultura',
-    'Ciencias Naturales (Ciencias de la Vida y el Ambiente)','Química','Física','Biología','Matemática'
-  ]
-};
-function getSubjectsFor(modality, grade) {
-  const number = Number(String(grade || '').match(/\d+/)?.[0] || 0);
-  if (modality === 'primaria') {
-    if (!number && String(grade).toLowerCase() !== 'multigrado') return [];
-    const shared = subjectCatalog.primary.filter(subject => !subject.startsWith('Estudios Sociales') && !subject.startsWith('Ciencias Naturales') && subject !== 'Conociendo mi Mundo');
-    if (String(grade).toLowerCase() === 'multigrado') return [...shared, 'Conociendo mi Mundo', 'Estudios Sociales (Historia y Geografía)', 'Ciencias Naturales (Ciencias de la Vida y del Ambiente)'];
-    return number <= 2 ? [...shared, 'Conociendo mi Mundo'] : [...shared, 'Estudios Sociales (Historia y Geografía)', 'Ciencias Naturales (Ciencias de la Vida y del Ambiente)'];
-  }
-  if (modality === 'secundaria') {
-    if (String(grade).toLowerCase() === 'multigrado') return subjectCatalog.secondary;
-    if (!number) return [];
-    const gradeSpecific = new Set([
-      'Ciencias Sociales (Geografía)','Ciencias Sociales (Historia)','Ciencias Sociales (Economía)',
-      'Ciencias Sociales (Sociología)','Ciencias Sociales (Filosofía)','Talleres de Arte y Cultura',
-      'Ciencias Naturales (Ciencias de la Vida y el Ambiente)','Química','Física','Biología'
-    ]);
-    const shared = subjectCatalog.secondary.filter(subject => !gradeSpecific.has(subject));
-    if (number >= 7 && number <= 9) return [...shared, 'Ciencias Sociales (Geografía)', 'Ciencias Sociales (Historia)', 'Talleres de Arte y Cultura', 'Ciencias Naturales (Ciencias de la Vida y el Ambiente)'];
-    if (number === 10) return [...shared, 'Ciencias Sociales (Economía)', 'Química', 'Física'];
-    if (number === 11) return [...shared, 'Ciencias Sociales (Sociología)', 'Ciencias Sociales (Filosofía)', 'Física', 'Biología'];
-    return [];
-  }
-  return [];
-}
+const subjectCatalog = window.SyllaboSubjects.catalog;
+const getSubjectsFor = window.SyllaboSubjects.getFor;
+const populateSubjectChoices = window.SyllaboSubjects.populateChoices;
 function getSelectedSubjects(form) { return [...form.querySelectorAll('input[name="subject_choice"]:checked')].map(input => input.value); }
-function populateSubjectChoices(form, selected = getSelectedSubjects(form)) {
-  const container = form.querySelector('[data-subject-choices]'); if (!container) return;
-  const available = getSubjectsFor(form.elements.modality?.value || '', form.elements.primary_grade?.value || '');
-  const known = new Set([...subjectCatalog.primary, ...subjectCatalog.secondary]);
-  const custom = selected.filter(subject => !known.has(subject));
-  const subjects = [...new Set([...available, ...custom])];
-  container.innerHTML = subjects.length ? subjects.map(subject => `<label class="choice"><input type="checkbox" name="subject_choice" value="${escapeHtml(subject)}" ${selected.includes(subject)?'checked':''}>${escapeHtml(subject)}</label>`).join('') : '<span class="muted">Elegí modalidad y grado para ver las materias sugeridas. Podés agregar una asignatura propia abajo.</span>';
-}
 function addCustomSubject(form) {
   const input = form.elements.custom_subject; const value = String(input.value || '').trim().replace(/\s+/g, ' ');
   if (!value) { input.focus(); return; }
@@ -203,7 +159,7 @@ for (const formId of ['onboardingForm','profileForm']) {
   form.elements.primary_grade.addEventListener('change', () => populateSubjectChoices(form));
 }
 $('#scheduleForm').elements.grade.addEventListener('change', () => populateScheduleSubjectSuggestions(currentProfile, $('#scheduleForm').elements.grade.value));
-document.querySelectorAll('[data-add-subject]').forEach(button => button.addEventListener('click', () => addCustomSubject($(`#${button.dataset.addSubject}`))));
+document.querySelectorAll('[data-add-subject]').forEach(button => { if (!button.dataset.subjectFallback) button.addEventListener('click', () => addCustomSubject($(`#${button.dataset.addSubject}`))); });
 function readProfileForm(form) {
   const data = Object.fromEntries(new FormData(form).entries());
   const selectedSubjects=getSelectedSubjects(form);
