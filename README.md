@@ -10,8 +10,8 @@ Asistente de planificación docente con ficha de bienvenida, perfil, agenda sema
 - Materias sugeridas según modalidad y grado; el docente puede agregar asignaturas de su centro.
 - Encuesta breve del entorno docente, incluida la edad más frecuente del grupo; las respuestas quedan en el perfil y ayudan a adecuar actividades y ejemplos.
 - La materia se elige desde las materias guardadas por el docente y el grado se completa desde el perfil.
-- Iconos Lucide coherentes para dictado por voz, mostrar/ocultar contraseña y acciones.
-- Dictado por voz en tema, contenido, indicador, criterios y recursos; usa el reconocimiento del navegador y puede enviar audio al servicio de voz de ese navegador según su configuración.
+- Iconos Lucide 0.468.0 locales para dictado por voz, mostrar/ocultar contraseña y acciones; están en `public/icons/` y no dependen de un CDN.
+- Dictado por voz en tema, contenido, indicador, criterios y recursos; usa el reconocimiento del navegador en Chrome o Edge, requiere permiso de micrófono y conexión a internet.
 - Biblioteca de planes con búsqueda, filtros por asignatura y mes y orden por fecha, materia o tema.
 - Horario semanal como agenda por día y hora, con un botón para establecerlo y alertas de clases que necesitan planificación.
 - Calendario con vistas de mes, semana y día; reúne clases, planes y actividades, festivales y feriados creados por el docente. Los feriados registrados omiten las clases recurrentes y las alertas de planificación de esas fechas.
@@ -52,7 +52,15 @@ Las materias se filtran según modalidad y grado. La lista inicial sigue los pla
 - Primaria: [Plan de estudios de Educación Primaria Regular (carga semanal, vigente desde 2019)](https://nicaraguaeduca.mined.gob.ni/wp-content/uploads/2023/09/I-UP-PR-29082023-VF.pdf). En 1.º y 2.º, Estudios Sociales y Ciencias Naturales se integran en Conociendo mi Mundo; de 3.º a 6.º aparecen como asignaturas separadas.
 - Secundaria regular: [Plan de estudios de Educación Secundaria Regular (carga semanal, vigente desde 2019)](https://nicaraguaeduca.mined.gob.ni/wp-content/uploads/2023/07/V-UP-EFPD-SR.pdf), con opciones diferenciadas por grado para Ciencias Sociales y las ciencias de 7.º a 11.º.
 
-La aplicación presenta la selección de materias con el nombre pedagógico del área/asignatura y no usa marcas institucionales en la interfaz.
+La aplicación presenta la selección de materias con el nombre pedagógico del área/asignatura y no usa marcas institucionales en la interfaz. La selección por grado queda así:
+
+- Primaria 1.º–2.º: materias comunes y Conociendo mi Mundo; en esta asignatura se integran Estudios Sociales y Ciencias Naturales.
+- Primaria 3.º–6.º: materias comunes, Estudios Sociales (Historia y Geografía) y Ciencias Naturales.
+- Secundaria 7.º–9.º: materias comunes, Geografía, Historia, Talleres de Arte y Cultura y Ciencias Naturales.
+- Secundaria 10.º: materias comunes, Economía, Química y Física.
+- Secundaria 11.º: materias comunes, Sociología, Filosofía, Física y Biología.
+
+Se pueden añadir asignaturas propias del centro, modalidad o programa del docente.
 
 ## IA externa
 

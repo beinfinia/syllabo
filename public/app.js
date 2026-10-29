@@ -4,19 +4,8 @@ const SUPABASE_URL = 'https://rrptfgdshlrfongkfppv.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_VIbLFUuvaksiYulO8-CuCQ_zRY92zUp';
 const PRODUCTION_APP_URL = 'https://syllabo.beinfinia.com/';
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-let lucide = null;
-async function loadIconLibrary() {
-  try {
-    lucide = await import('https://esm.sh/lucide@0.468.0?bundle');
-    renderIcons();
-  } catch (error) { console.warn('No se pudo cargar Lucide Icons.', error); }
-}
-function renderIcons() {
-  if (!lucide) return;
-  lucide.createIcons({ icons: { Mic:lucide.Mic, Eye:lucide.Eye, EyeOff:lucide.EyeOff, Plus:lucide.Plus } });
-}
-void loadIconLibrary();
 const $ = (selector) => document.querySelector(selector);
+const iconMarkup = (name) => `<img class="icon" src="./icons/${name}.svg" alt="">`;
 const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
 const weekdays = { 1:'Lunes', 2:'Martes', 3:'Miércoles', 4:'Jueves', 5:'Viernes' };
 function authRedirectTo() {
@@ -95,7 +84,6 @@ async function openApp(user) {
       form.elements.modality.value = profile.modality || '';
       populateGradeChoices(form, profile.modality || '', profile.primary_grade || '');
       populateSubjectChoices(form, profile.subjects || []);
-      renderIcons();
       return;
     }
     $('#onboarding').classList.add('hidden'); document.body.classList.remove('onboarding-open'); $('#app').classList.remove('hidden');
@@ -104,10 +92,10 @@ async function openApp(user) {
     const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'docente';
     $('#welcomeTitle').textContent = `¡Hola, ${profile.gender === 'mujer' ? 'maestra' : 'maestro'} ${fullName}!`;
     if (profile.primary_grade && !$('#planForm').elements.grade.value) $('#planForm').elements.grade.value = profile.primary_grade;
-    populatePlanSubjectOptions(profile); updatePlanAgeHint(profile); populateScheduleSubjectSuggestions(profile);
+    populatePlanSubjectOptions(profile); updatePlanAgeHint(profile); populateScheduleGradeOptions(profile, profile.primary_grade);
     await loadHome();
     initializedUserId = user.id; openingUserId = null;
-  } catch (err) { openingUserId = null; $('#onboarding').classList.add('hidden'); document.body.classList.remove('onboarding-open'); $('#auth').classList.remove('hidden'); setStatus('#authStatus', `No se pudo cargar tu perfil: ${friendlyError(err)}`, 'error'); }
+  } catch (err) { openingUserId = null; $('#app').classList.add('hidden'); $('#onboarding').classList.add('hidden'); document.body.classList.remove('onboarding-open'); $('#auth').classList.remove('hidden'); setStatus('#authStatus', `No se pudo cargar tu perfil: ${friendlyError(err)}`, 'error'); }
 }
 const subjectCatalog = {
   primary: [
@@ -127,17 +115,24 @@ const subjectCatalog = {
 function getSubjectsFor(modality, grade) {
   const number = Number(String(grade || '').match(/\d+/)?.[0] || 0);
   if (modality === 'primaria') {
-    if (!number || String(grade).toLowerCase().includes('multigrado')) return subjectCatalog.primary;
-    return number > 0 && number <= 2
-      ? subjectCatalog.primary.filter(subject => !subject.startsWith('Estudios Sociales') && !subject.startsWith('Ciencias Naturales')).concat('Conociendo mi Mundo')
-      : subjectCatalog.primary.filter(subject => subject !== 'Conociendo mi Mundo');
+    if (!number && String(grade).toLowerCase() !== 'multigrado') return [];
+    const shared = subjectCatalog.primary.filter(subject => !subject.startsWith('Estudios Sociales') && !subject.startsWith('Ciencias Naturales') && subject !== 'Conociendo mi Mundo');
+    if (String(grade).toLowerCase() === 'multigrado') return [...shared, 'Conociendo mi Mundo', 'Estudios Sociales (Historia y Geografía)', 'Ciencias Naturales (Ciencias de la Vida y del Ambiente)'];
+    return number <= 2 ? [...shared, 'Conociendo mi Mundo'] : [...shared, 'Estudios Sociales (Historia y Geografía)', 'Ciencias Naturales (Ciencias de la Vida y del Ambiente)'];
   }
   if (modality === 'secundaria') {
-    if (!number || String(grade).toLowerCase().includes('multigrado')) return subjectCatalog.secondary;
-    if (number >= 7 && number <= 9) return subjectCatalog.secondary.filter(subject => !/Economía|Sociología|Filosofía|Química|Física|Biología/.test(subject));
-    if (number === 10) return subjectCatalog.secondary.filter(subject => !/Sociología|Filosofía|Biología/.test(subject));
-    if (number === 11) return subjectCatalog.secondary.filter(subject => !/Economía|Química/.test(subject));
-    return subjectCatalog.secondary;
+    if (String(grade).toLowerCase() === 'multigrado') return subjectCatalog.secondary;
+    if (!number) return [];
+    const gradeSpecific = new Set([
+      'Ciencias Sociales (Geografía)','Ciencias Sociales (Historia)','Ciencias Sociales (Economía)',
+      'Ciencias Sociales (Sociología)','Ciencias Sociales (Filosofía)','Talleres de Arte y Cultura',
+      'Ciencias Naturales (Ciencias de la Vida y el Ambiente)','Química','Física','Biología'
+    ]);
+    const shared = subjectCatalog.secondary.filter(subject => !gradeSpecific.has(subject));
+    if (number >= 7 && number <= 9) return [...shared, 'Ciencias Sociales (Geografía)', 'Ciencias Sociales (Historia)', 'Talleres de Arte y Cultura', 'Ciencias Naturales (Ciencias de la Vida y el Ambiente)'];
+    if (number === 10) return [...shared, 'Ciencias Sociales (Economía)', 'Química', 'Física'];
+    if (number === 11) return [...shared, 'Ciencias Sociales (Sociología)', 'Ciencias Sociales (Filosofía)', 'Física', 'Biología'];
+    return [];
   }
   return [];
 }
@@ -149,7 +144,6 @@ function populateSubjectChoices(form, selected = getSelectedSubjects(form)) {
   const custom = selected.filter(subject => !known.has(subject));
   const subjects = [...new Set([...available, ...custom])];
   container.innerHTML = subjects.length ? subjects.map(subject => `<label class="choice"><input type="checkbox" name="subject_choice" value="${escapeHtml(subject)}" ${selected.includes(subject)?'checked':''}>${escapeHtml(subject)}</label>`).join('') : '<span class="muted">Elegí modalidad y grado para ver las materias sugeridas. Podés agregar una asignatura propia abajo.</span>';
-  renderIcons();
 }
 function addCustomSubject(form) {
   const input = form.elements.custom_subject; const value = String(input.value || '').trim().replace(/\s+/g, ' ');
@@ -169,17 +163,41 @@ function populateGradeChoices(form, modality, selected = '') {
   field.value = selected || '';
   populateSubjectChoices(form);
 }
+function populateScheduleGradeOptions(profile = currentProfile, selected = '') {
+  const field = $('#scheduleForm').elements.grade;
+  if (!field) return;
+  const modality = profile?.modality || '';
+  const first = modality === 'secundaria' ? 7 : 1;
+  const last = modality === 'primaria' ? 6 : modality === 'secundaria' ? 11 : 0;
+  const options = last ? Array.from({length:last-first+1}, (_, index) => `${first+index}° grado`) : [];
+  field.innerHTML = '<option value="">Elegí el grado</option>' + options.map(value => `<option value="${value}">${value}</option>`).join('') + '<option value="Multigrado">Multigrado</option>';
+  const value = selected || profile?.primary_grade || '';
+  if (value && ![...options, 'Multigrado'].includes(value)) field.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`);
+  field.value = value;
+  populateScheduleSubjectSuggestions(profile, field.value);
+}
+function populateScheduleSubjectSuggestions(profile = currentProfile, grade = '') {
+  const list = $('#scheduleSubjects');
+  if (!list) return;
+  const known = new Set([...subjectCatalog.primary, ...subjectCatalog.secondary]);
+  const custom = (profile?.subjects || []).filter(subject => !known.has(subject));
+  const options = [...new Set([...getSubjectsFor(profile?.modality || '', grade || profile?.primary_grade || ''), ...custom])];
+  list.innerHTML = options.map(subject => `<option value="${escapeHtml(subject)}"></option>`).join('');
+}
 for (const formId of ['onboardingForm','profileForm']) {
   const form = $(`#${formId}`);
   populateSubjectChoices(form);
   form.elements.modality.addEventListener('change', () => { populateGradeChoices(form, form.elements.modality.value); });
   form.elements.primary_grade.addEventListener('change', () => populateSubjectChoices(form));
 }
+$('#scheduleForm').elements.grade.addEventListener('change', () => populateScheduleSubjectSuggestions(currentProfile, $('#scheduleForm').elements.grade.value));
 document.querySelectorAll('[data-add-subject]').forEach(button => button.addEventListener('click', () => addCustomSubject($(`#${button.dataset.addSubject}`))));
 function readProfileForm(form) {
   const data = Object.fromEntries(new FormData(form).entries());
   const selectedSubjects=getSelectedSubjects(form);
-  delete data.custom_subject; data.subjects=[...new Set(selectedSubjects)];
+  delete data.custom_subject;
+  delete data.subject_choice;
+  data.subjects=[...new Set(selectedSubjects)];
   data.full_name = [data.first_name.trim(),data.last_name.trim()].filter(Boolean).join(' ');
   data.teacher_context = Object.fromEntries(['student_age_range','context_zone','class_size','internet_access','available_resources','planning_challenges','preferred_dynamics'].map(key=>[key,data[key] || '']));
   for (const key of Object.keys(data.teacher_context)) delete data[key];
@@ -210,7 +228,7 @@ async function saveTeacherProfile(form, onboarding = false) {
   currentProfile = saved; fillTeacherForm($('#profileForm'),saved); setTeacherIdentity(saved);
   $('#welcomeTitle').textContent = `¡Hola, ${saved.gender === 'mujer' ? 'maestra' : 'maestro'} ${[saved.first_name, saved.last_name].filter(Boolean).join(' ')}!`;
   if (saved.primary_grade) $('#planForm').elements.grade.value = saved.primary_grade;
-  populatePlanSubjectOptions(saved); updatePlanAgeHint(saved); populateScheduleSubjectSuggestions(saved);
+  populatePlanSubjectOptions(saved); updatePlanAgeHint(saved); populateScheduleGradeOptions(saved, saved.primary_grade);
   if (onboarding) { $('#onboarding').classList.add('hidden'); document.body.classList.remove('onboarding-open'); $('#app').classList.remove('hidden'); await loadHome(); }
   return saved;
 }
@@ -218,14 +236,14 @@ let activeRecognition = null;
 function startDictation(button) {
   const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!Recognition){setStatus('#planStatus','Este navegador no ofrece dictado de voz. Probá el micrófono del teclado del celular.','error');return;}
-  if(activeRecognition){activeRecognition.stop();activeRecognition=null;}
+  if(activeRecognition){activeRecognition.stop();return;}
   const field=document.getElementById(button.dataset.dictate); const recognition=new Recognition();
-  recognition.lang='es-NI';recognition.interimResults=false;recognition.maxAlternatives=1;activeRecognition=recognition;
-  button.classList.add('listening');button.innerHTML='<i data-lucide="mic" aria-hidden="true"></i><span>Escuchando…</span>';button.setAttribute('aria-pressed','true');renderIcons();setStatus('#planStatus','Hablá ahora; al terminar, el texto aparecerá en el campo.');
+  recognition.lang='es-MX';recognition.interimResults=false;recognition.maxAlternatives=1;activeRecognition=recognition;
+  button.classList.add('listening');button.innerHTML=`${iconMarkup('mic')}<span>Escuchando…</span>`;button.setAttribute('aria-pressed','true');setStatus('#planStatus','Hablá ahora; al terminar, el texto aparecerá en el campo.');
   recognition.onresult=event=>{const transcript=event.results?.[0]?.[0]?.transcript?.trim();if(transcript){field.value=`${field.value.trim()}${field.value.trim()?' ':''}${transcript}`;field.dispatchEvent(new Event('input',{bubbles:true}));}};
-  recognition.onerror=event=>{const message=event.error==='not-allowed'?'Permití el acceso al micrófono para dictar.':event.error==='no-speech'?'No detecté voz. Intentá de nuevo.':event.error==='network'?'El servicio de reconocimiento necesita conexión. Revisá internet e intentá otra vez.':'No se pudo iniciar el dictado. Revisá el micrófono e intentá de nuevo.';setStatus('#planStatus',message,'error');};
-  recognition.onend=()=>{button.classList.remove('listening');button.innerHTML='<i data-lucide="mic" aria-hidden="true"></i><span>Dictar</span>';button.setAttribute('aria-pressed','false');renderIcons();if(activeRecognition===recognition)activeRecognition=null;};
-  try{recognition.start();}catch{button.classList.remove('listening');button.innerHTML='<i data-lucide="mic" aria-hidden="true"></i><span>Dictar</span>';button.setAttribute('aria-pressed','false');renderIcons();activeRecognition=null;setStatus('#planStatus','No se pudo iniciar el micrófono. Esperá un momento e intentá de nuevo.','error');}
+  recognition.onerror=event=>{const message=event.error==='not-allowed'||event.error==='service-not-allowed'?'Permití el acceso al micrófono en el navegador para dictar.':event.error==='no-speech'?'No detecté voz. Intentá de nuevo.':event.error==='network'?'El dictado requiere conexión a internet. Revisá la conexión e intentá otra vez.':event.error==='audio-capture'?'No encontré un micrófono disponible. Revisá el dispositivo.':event.error==='language-not-supported'?'El navegador no admite el idioma de dictado. Probá Chrome o Edge actualizado.':'No se pudo iniciar el dictado. Revisá el micrófono e intentá de nuevo.';setStatus('#planStatus',message,'error');};
+  recognition.onend=()=>{button.classList.remove('listening');button.innerHTML=`${iconMarkup('mic')}<span>Dictar</span>`;button.setAttribute('aria-pressed','false');if(activeRecognition===recognition)activeRecognition=null;};
+  try{recognition.start();}catch{button.classList.remove('listening');button.innerHTML=`${iconMarkup('mic')}<span>Dictar</span>`;button.setAttribute('aria-pressed','false');activeRecognition=null;setStatus('#planStatus','No se pudo iniciar el micrófono. Esperá un momento e intentá de nuevo.','error');}
 }
 document.querySelectorAll('[data-dictate]').forEach(button=>button.addEventListener('click',()=>startDictation(button)));
 $('#onboardingForm').addEventListener('submit', async event => {
@@ -258,10 +276,9 @@ document.querySelectorAll('[data-password-toggle]').forEach(button => button.add
   const input = document.getElementById(button.dataset.passwordToggle);
   const show = input.type === 'password';
   input.type = show ? 'text' : 'password';
-  button.innerHTML = `<i data-lucide="${show ? 'eye-off' : 'eye'}" aria-hidden="true"></i><span>${show ? 'Ocultar' : 'Mostrar'}</span>`;
+  button.innerHTML = `${iconMarkup(show ? 'eye-off' : 'eye')}<span>${show ? 'Ocultar' : 'Mostrar'}</span>`;
   button.setAttribute('aria-pressed', String(show));
   button.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
-  renderIcons();
 }));
 $('#authForm').addEventListener('submit', async event => {
   event.preventDefault(); const button = $('#authSubmit'); button.disabled = true;
@@ -438,14 +455,16 @@ async function saveCurrentPlan() {
   if (editor) generatedPlanText = editor.value;
   const row = { ...data, plan_body:{ text:generatedPlanText, plan:generatedPlanData, source:$('#aiState').textContent.startsWith('Borrador guiado') ? 'guided' : 'ai' }, updated_at:new Date().toISOString() };
   setStatus('#saveStatus', 'Guardando…'); $('#savePlan').disabled = true;
-  let query = supabase.from('lesson_plans');
-  if (currentPlanId) query = query.update(row).eq('id', currentPlanId);
-  else query = query.insert(row);
-  const { data:saved, error } = await query.select().single();
-  $('#savePlan').disabled = false;
-  if (error) { setStatus('#saveStatus', friendlyError(error), 'error'); return; }
-  currentPlanId = saved.id; setStatus('#saveStatus', 'Plan guardado en tu cuenta.', 'ok'); $('#savePlan').textContent = 'Guardar cambios';
-  await loadHome();
+  try {
+    let query = supabase.from('lesson_plans');
+    if (currentPlanId) query = query.update(row).eq('id', currentPlanId);
+    else query = query.insert(row);
+    const { data:saved, error } = await query.select().single();
+    if (error) throw error;
+    currentPlanId = saved.id; setStatus('#saveStatus', 'Plan guardado en tu cuenta.', 'ok'); $('#savePlan').textContent = 'Guardar cambios';
+    await loadHome();
+  } catch(error) { setStatus('#saveStatus', friendlyError(error), 'error'); }
+  finally { $('#savePlan').disabled = false; }
 }
 $('#newPlan').addEventListener('click', () => {
   const grade = $('#profileForm').elements.primary_grade.value || '';
@@ -508,14 +527,22 @@ $('#scheduleForm').addEventListener('submit', async event => {
   event.preventDefault(); const form=event.currentTarget; const values=Object.fromEntries(new FormData(form).entries());
   values.weekday=Number(values.weekday); values.duration_minutes=Number(values.duration_minutes); values.start_time=values.start_time || null;
   const button=form.querySelector('button[type="submit"]') || form.querySelector('button'); button.disabled=true;
-  const {error}=await supabase.from('class_schedules').insert(values); button.disabled=false;
-  if(error){setStatus('#scheduleStatus',friendlyError(error),'error');return;}
-  form.reset(); form.elements.duration_minutes.value=45; setStatus('#scheduleStatus','Clase agregada a tu agenda semanal.','ok');
-  await loadSchedule(); await loadHome(); await loadCalendar();
+  setStatus('#scheduleStatus','Guardando clase…');
+  try {
+    const {error}=await supabase.from('class_schedules').insert(values);
+    if(error) throw error;
+    form.reset(); form.elements.duration_minutes.value=45;
+    populateScheduleGradeOptions(currentProfile);
+    setStatus('#scheduleStatus','Clase agregada a tu horario.','ok');
+    await loadSchedule(); await loadHome(); await loadCalendar();
+  } catch(error) { setStatus('#scheduleStatus',friendlyError(error),'error'); }
+  finally { button.disabled=false; }
 });
 async function loadSchedule() {
   $('#scheduleList').innerHTML='<div class="empty">Cargando agenda…</div>';
-  const {data,error}=await supabase.from('class_schedules').select('*').order('weekday').order('start_time');
+  let data,error;
+  try { ({data,error}=await supabase.from('class_schedules').select('*').order('weekday').order('start_time')); }
+  catch(err) { $('#scheduleList').innerHTML=`<div class="empty">${escapeHtml(friendlyError(err))}</div>`;return; }
   if(error){$('#scheduleList').innerHTML=`<div class="empty">${escapeHtml(friendlyError(error))}</div>`;return;}
   if(!data?.length){$('#scheduleList').innerHTML='<div class="empty">Todavía no configuraste tus bloques de clase. Usá “Establecer horario” para comenzar.</div>';$('#scheduleForm').classList.add('hidden');$('#establishSchedule').textContent='Establecer horario';return;}
   $('#establishSchedule').textContent=$('#scheduleForm').classList.contains('hidden')?'Agregar bloque de clase':'Cerrar formulario';
@@ -542,9 +569,13 @@ $('#calendarEventForm').addEventListener('submit',async event=>{
   event.preventDefault();const data=Object.fromEntries(new FormData(event.currentTarget).entries());const id=data.id;delete data.id;
   data.start_time=data.start_time||null;data.end_date=data.end_date||null;data.updated_at=new Date().toISOString();
   if(data.end_date&&data.end_date<data.start_date){setStatus('#eventStatus','La fecha de fin debe ser igual o posterior a la fecha de inicio.','error');return;}
-  const query=supabase.from('calendar_events');const result=id?await query.update(data).eq('id',id).select().single():await query.insert(data).select().single();
-  if(result.error){setStatus('#eventStatus',friendlyError(result.error),'error');return;}
-  $('#calendarEventFormWrap').classList.add('hidden');await loadCalendar();
+  const form=event.currentTarget;const button=form.querySelector('button[type="submit"]');button.disabled=true;setStatus('#eventStatus','Guardando fecha…');
+  try {
+    const query=supabase.from('calendar_events');const result=id?await query.update(data).eq('id',id).select().single():await query.insert(data).select().single();
+    if(result.error)throw result.error;
+    $('#calendarEventFormWrap').classList.add('hidden');setStatus('#eventStatus','Fecha guardada.','ok');await loadCalendar();
+  } catch(error) { setStatus('#eventStatus',friendlyError(error),'error'); }
+  finally { button.disabled=false; }
 });
 function openCalendarEventForm(eventData={}) {
   const form=$('#calendarEventForm');form.reset();form.elements.id.value=eventData.id||'';
@@ -553,11 +584,14 @@ function openCalendarEventForm(eventData={}) {
 }
 async function loadCalendar() {
   if(!currentUser)return;
-  const [{data:plans,error:pErr},{data:events,error:eErr},{data:schedule,error:sErr}]=await Promise.all([
-    supabase.from('lesson_plans').select('*').order('lesson_date'),
-    supabase.from('calendar_events').select('*').order('start_date'),
-    supabase.from('class_schedules').select('id,weekday,start_time,subject,grade,section,duration_minutes').order('weekday').order('start_time')
-  ]);
+  let plans,events,schedule,pErr,eErr,sErr;
+  try {
+    [{data:plans,error:pErr},{data:events,error:eErr},{data:schedule,error:sErr}]=await Promise.all([
+      supabase.from('lesson_plans').select('*').order('lesson_date'),
+      supabase.from('calendar_events').select('*').order('start_date'),
+      supabase.from('class_schedules').select('id,weekday,start_time,subject,grade,section,duration_minutes').order('weekday').order('start_time')
+    ]);
+  } catch(error) { $('#calendarBoard').innerHTML=`<div class="empty">${escapeHtml(friendlyError(error))}</div>`;return; }
   const error=pErr||eErr||sErr;if(error){$('#calendarBoard').innerHTML=`<div class="empty">${escapeHtml(friendlyError(error))}</div>`;return;}
   allCalendarPlans=plans||[];allCalendarEvents=events||[];allCalendarSchedule=schedule||[];renderCalendar();
 }
