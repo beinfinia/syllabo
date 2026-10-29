@@ -35,3 +35,85 @@ button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #34
  footer{padding-bottom:100px}
 }
 @media print{.device-access,.creation-steps,#offlinePanel{display:none!important}}
+
+/* Accessible proportions and account-level reading preferences. */
+:root{--reading-size:16px;--body-leading:1.6}
+:root[data-reading-size="large"]{--reading-size:18px}
+:root[data-reading-size="extra"]{--reading-size:20px}
+body{font-size:var(--reading-size);line-height:var(--body-leading)}
+#app>header{background:#eae6fa!important;border-bottom:1px solid #d8d3ee!important;color:#29324a}
+#app>header .brand-light{color:#26304a}
+#app>header .head-actions .ghost{background:#ffffffb8;color:#424b69;border-color:#d2cbe6}
+.avatar{width:42px;height:42px;min-width:42px;aspect-ratio:1;border-radius:50%!important;overflow:hidden;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 0 0 1px #d6cfea;background:#f9f7ff}
+.avatar img,.avatar-image{width:100%;height:100%;object-fit:cover;border-radius:50%!important;display:block}
+.avatar>span{font-size:25px;line-height:1;display:flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:50%}
+.avatar-option img,.avatar-option .avatar-emoji{width:56px;height:56px;min-width:56px;border-radius:50%!important;object-fit:cover;background:#f1eefb;display:flex;align-items:center;justify-content:center;overflow:hidden;line-height:1;font-size:37px}
+.avatar-option{gap:9px}.avatar-option:has(input:focus-visible){outline:3px solid #3457c4;outline-offset:3px}
+.reading-settings{min-width:0;margin:6px 0 22px;padding:18px;border:1px solid #dfe4f0;border-radius:20px;background:#f8f9fe}
+.reading-settings legend{font-size:1.05em;font-weight:900;padding:0 8px;color:#3d4f78}
+.reading-settings label{margin:0 0 10px}.reading-settings .muted{margin:0 0 14px}
+.reading-example{padding:16px;background:white;border:1px solid #e0e5f0;border-radius:15px;font-size:var(--reading-size);font-weight:800;color:#2e3e5a;line-height:1.65}
+.reading-example span{font-size:.95em;font-weight:500;color:#56647b}
+#app main p,#app .plan-block p,#app .plan-paper,#app .plan-meta,#offlinePanel .offline-item{font-size:var(--reading-size);line-height:1.65}
+#app .muted,#app .form-note,#app .status,#app .section-hint,#app .plan-breadcrumb,#app #planResults,#app .folder-heading .muted{font-size:calc(var(--reading-size) - 2px);line-height:1.6}
+#app label,#app .field-label,#app .choice,#app #planes .filter-row label{font-size:calc(var(--reading-size) - 1px);line-height:1.5}
+#app input,#app select,#app textarea,#app #planEditor,#app #planes input,#app #planes select{font-size:var(--reading-size);line-height:1.5}
+#app .subject-folder h2,#app .timeline-day .plan-list-row h3,#app .folder-heading h2,#app .agenda-row strong{font-size:var(--reading-size);line-height:1.45}
+#app .subject-folder small,#app .subject-folder .folder-count,#app .timeline-day .plan-list-row .muted,#app .timeline-date time,#app .agenda-hour{font-size:calc(var(--reading-size) - 3px);line-height:1.5}
+#app .checklist-table{font-size:calc(var(--reading-size) - 2px)}
+#app .subject-folder{height:auto;overflow-wrap:anywhere;justify-content:flex-start}
+#app .plan-breadcrumb{flex-wrap:wrap}
+#app .plan-meta>div,#app .row>span{min-width:0;overflow-wrap:anywhere}
+#app .plan-paper .row{flex-wrap:wrap}
+button,input,select,textarea{max-width:100%;box-sizing:border-box}
+@media(max-width:720px){
+ main{padding:18px 14px calc(125px + env(safe-area-inset-bottom))}
+ #app>header{padding:12px 16px!important}
+ .head-top{gap:10px;align-items:center}.head-actions{gap:8px;flex-wrap:wrap;justify-content:flex-end}
+ .brand-light{font-size:23px;white-space:nowrap}.brand-light .mark{width:31px;height:31px}
+ .avatar{width:42px;height:42px;min-width:42px;flex-shrink:0}
+ #app .head-actions .ghost{min-height:44px;padding:8px 11px;font-size:13px;border-radius:12px}
+ #app .card{padding:20px 17px;border:1px solid #e8ecf5;border-radius:22px;margin-bottom:16px}
+ #app h1{font-size:calc(var(--reading-size) + 10px);line-height:1.22;overflow-wrap:anywhere}
+ #app h2{font-size:calc(var(--reading-size) + 3px);line-height:1.35}
+ #app h3{font-size:var(--reading-size);line-height:1.5}
+ #app main button:not(.calendar-entry):not(.calendar-more):not(.text-btn),#offlinePanel button{min-height:48px;padding:11px 15px;font-size:calc(var(--reading-size) - 1px);line-height:1.4;border-radius:14px;white-space:normal;overflow-wrap:anywhere}
+ #app .text-btn{min-height:44px;font-size:calc(var(--reading-size) - 2px);white-space:normal}
+ #app .subject-folders{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+ #app main button.subject-folder{padding:17px 14px;min-height:195px;text-align:left;border-radius:22px}
+ #app .subject-folder h2{font-size:var(--reading-size);line-height:1.35;margin:0}
+ #app .subject-folder .folder-symbol{font-size:34px;line-height:1;margin:12px 0 8px}
+ #app .subject-folder small{font-size:calc(var(--reading-size) - 3px)}
+ #app .stat{padding:15px 11px;border-radius:18px;min-width:0}
+ #app .stat strong{font-size:calc(var(--reading-size) + 10px)}
+ #app .stat span{font-size:calc(var(--reading-size) - 4px);line-height:1.4}
+ #app .timeline-day .plan-list-row{padding:17px 14px;border-radius:18px;gap:14px}
+ #app .plan-list-row>.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:stretch}
+ #app .plan-list-row .danger-btn{font-size:calc(var(--reading-size) - 2px)}
+ #app .form-actions{gap:10px}#app .form-actions>button{width:100%}
+ #app .voice-control{gap:9px}#app .voice-control textarea{min-height:128px}
+ #app .dictate-button{width:100%}
+ #app .reading-settings{padding:15px 13px;border-radius:18px}
+ #app .reading-settings select{min-height:52px}
+ #app .avatar-options{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+ #app .avatar-option{padding:13px 6px;min-width:0;font-size:calc(var(--reading-size) - 3px);border-radius:18px}
+ #app .avatar-option:has(input:checked){padding:12px 5px}
+ #app .avatar-option input{width:20px;height:20px;min-height:20px;margin:0}
+ #app .avatar-option img,#app .avatar-option .avatar-emoji{width:54px;height:54px;min-width:54px}
+ #app .calendar-toolbar strong{font-size:calc(var(--reading-size) + 1px)}
+ #app .calendar-entry{font-size:11px;min-height:26px;padding:4px;white-space:normal;line-height:1.35;overflow-wrap:anywhere}
+ #app .calendar-more{min-height:26px;font-size:11px}
+ #app .calendar-cell{min-width:0}
+ #app .nav .tab{min-height:64px}
+ #app .nav .tab span{font-size:12px;line-height:1.25}
+ #app .nav .tab .icon{width:23px;height:23px}
+ #app .saved-plan-view .plan-paper{padding:22px 16px;border-radius:20px}
+}
+@media(max-width:380px){
+ #app .subject-folders{grid-template-columns:1fr}
+ #app main button.subject-folder{min-height:170px}
+ #app .avatar-options{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #app .plan-list-row>.row{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+@media print{body,#app .plan-paper,#app .plan-block p,#app .plan-meta{font-size:11pt!important;line-height:1.55}#app .checklist-table{font-size:10pt!important}}

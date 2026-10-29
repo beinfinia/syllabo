@@ -178,6 +178,8 @@ function readProfileForm(form) {
   const customResources=window.SyllaboResources?.normalize(form.elements.other_resources?.value || '') || [];
   data.full_name = [data.first_name.trim(),data.last_name.trim()].filter(Boolean).join(' ');
   data.teacher_context = { ...(currentProfile?.teacher_context || {}), ...Object.fromEntries(['student_age_range','context_zone','class_size','internet_access','planning_challenges','preferred_dynamics'].map(key=>[key,data[key] || ''])) };
+  data.teacher_context.reading_size = ['normal','large','extra'].includes(data.reading_size) ? data.reading_size : (data.teacher_context.reading_size || 'normal');
+  delete data.reading_size;
   data.teacher_context.avatar = ['woman','man','flower','owl','book'].includes(data.avatar_choice) ? data.avatar_choice : (data.teacher_context.avatar || (data.gender==='mujer'?'woman':'man'));
   delete data.avatar_choice;
   data.teacher_context.available_resources=[...new Set([...selectedResources,...customResources])];
@@ -190,6 +192,7 @@ function fillTeacherForm(form, profile) {
   populateGradeChoices(form,profile.modality || '',profile.primary_grade || '');
   populateSubjectChoices(form,profile.subjects || []);
   const context = profile.teacher_context || {};
+  if(form.elements.reading_size) form.elements.reading_size.value = context.reading_size || 'normal';
   if(form.elements.avatar_choice) form.elements.avatar_choice.value = context.avatar || (profile.gender==='mujer'?'woman':'man');
   for (const key of ['student_age_range','context_zone','class_size','internet_access','planning_challenges','preferred_dynamics']) if (form.elements[key]) form.elements[key].value = context[key] || '';
   const resources=window.SyllaboResources?.normalize(context.available_resources) || [];
@@ -209,7 +212,18 @@ function updatePlanAgeHint(profile) {
   const range = profile?.teacher_context?.student_age_range || '';
   $('#planContextHint').textContent = `El plan usará ${grade}${range ? ` y adaptará ejemplos y dinámicas para estudiantes de ${range}` : ''}. Podés actualizar estos datos en Mi perfil.`;
 }
+function applyReadingPreference(value) {
+  const size=['normal','large','extra'].includes(value)?value:'normal';
+  document.documentElement.dataset.readingSize=size;
+}
+$('#profileForm').addEventListener('change',event=>{
+  if(event.target.name==='reading_size') {
+    applyReadingPreference(event.target.value);
+    setStatus('#profileStatus','Vista previa aplicada. Pulsá «Guardar perfil» para conservar el tamaño de letra.');
+  }
+});
 function setTeacherIdentity(profile) {
+  applyReadingPreference(profile.teacher_context?.reading_size);
   const avatar=$('#teacherAvatar'); const selected=profile.teacher_context?.avatar || (profile.gender==='mujer'?'woman':'man');
   const symbols={flower:'🌻',owl:'🦉',book:'📚'};
   avatar.innerHTML=symbols[selected]?`<span aria-hidden="true">${symbols[selected]}</span>`:`<img class="avatar-image" src="./icons/avatar-${selected==='woman'?'woman':'man'}.svg" alt="">`;
