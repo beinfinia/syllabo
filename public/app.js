@@ -60,9 +60,13 @@ function prettyDate(value) {
   return new Date(`${value}T12:00:00`).toLocaleDateString('es-NI', { day:'numeric', month:'long', year:'numeric' });
 }
 function showPage(page) {
+  if(page==='crear' && $('#savedPlanDocument')?.contains($('#planPreview'))) {
+    $('#crear').append($('#planPreview'));
+    startPlanFromClass();
+  }
   if (page === 'horario') page = 'calendario';
   document.querySelectorAll('.page').forEach(el => el.classList.toggle('hidden', el.id !== page));
-  document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.page === page));
+  document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.page === (page==='documento'?'planes':page)));
   if (page === 'planes') loadPlans();
   if (page === 'horario') loadSchedule();
   if (page === 'calendario') { loadCalendar(); loadSchedule(); }
@@ -636,7 +640,7 @@ function renderPlanPreview(plan, source = 'guided') {
     finally {button.disabled=false;}
   });
   $('#printPlan').addEventListener('click',()=>{generatedPlanText=$('#planEditor').value;const paper=$('#planPreview .plan-paper');const edited=generatedPlanText.trim()!==structuredText.trim();paper.classList.toggle('print-text-only',edited);$('#printBody').textContent=generatedPlanText;window.print();paper.classList.remove('print-text-only');});
-  $('#discardPlan').addEventListener('click',()=>{$('#planPreview').innerHTML='';currentPlanId=null;generatedPlanText='';generatedPlanData=null;});
+  $('#discardPlan').addEventListener('click',()=>{$('#planPreview').innerHTML='';currentPlanId=null;generatedPlanText='';generatedPlanData=null;if($('#savedPlanDocument')?.contains($('#planPreview')))showPage('planes');});
 }
 async function saveCurrentPlan() {
   const data = getPlanFormData();
@@ -658,6 +662,7 @@ async function saveCurrentPlan() {
   finally { $('#savePlan').disabled = false; }
 }
 function startPlanFromClass({ date = localISODate(), subject = '', grade = '', duration = 45 } = {}) {
+  if($('#savedPlanDocument')?.contains($('#planPreview'))) $('#crear').append($('#planPreview'));
   const form = $('#planForm');
   form.reset(); form.elements.lesson_date.value = date; form.elements.duration_minutes.value = duration; planResourcesOverride=null;
   planningGradeOverride = grade || currentProfile?.primary_grade || '';
@@ -715,7 +720,7 @@ function renderPlanList() {
   const days=new Map(); for(const plan of plans){if(!days.has(plan.lesson_date))days.set(plan.lesson_date,[]);days.get(plan.lesson_date).push(plan);}
   $('#plansList').innerHTML=plans.length?[...days].map(([date,dayPlans])=>{
     const day=localDateFromKey(date);const weekday=day.toLocaleDateString('es-NI',{weekday:'long'});const monthYear=day.toLocaleDateString('es-NI',{month:'long',year:'numeric'});
-    return `<section class="timeline-day" aria-label="${escapeHtml(weekday+', '+prettyDate(date))}"><header class="timeline-date" style="position:static;box-shadow:none"><span class="timeline-date-number">${day.getDate()}</span><div><h2>${escapeHtml(weekday)}</h2><time datetime="${escapeHtml(date)}">${escapeHtml(monthYear)}</time></div><span class="pill">${date===localISODate()?'Hoy · ':''}${dayPlans.length} ${dayPlans.length===1?'plan':'planes'}</span></header>${dayPlans.map(plan=>`<article class="plan-list-row"><div><h3>${escapeHtml(plan.content||plan.topic||'Plan de clase')}</h3><p class="muted">${escapeHtml(plan.grade)} · ${escapeHtml(plan.duration_minutes)} minutos</p></div><div class="row"><button class="soft-btn" data-open-plan="${plan.id}">Abrir / editar</button><button class="danger-btn" data-delete-plan="${plan.id}" aria-label="Eliminar plan ${escapeHtml(plan.topic)}">Eliminar</button></div></article>`).join('')}</section>`;
+    return `<section class="timeline-day" aria-label="${escapeHtml(weekday+', '+prettyDate(date))}"><header class="timeline-date" style="position:static;box-shadow:none"><span class="timeline-date-number">${day.getDate()}</span><div><h2>${escapeHtml(weekday)}</h2><time datetime="${escapeHtml(date)}">${escapeHtml(monthYear)}</time></div><span class="pill">${date===localISODate()?'Hoy · ':''}${dayPlans.length} ${dayPlans.length===1?'plan':'planes'}</span></header>${dayPlans.map(plan=>`<article class="plan-list-row"><div><h3>${escapeHtml(plan.content||plan.topic||'Plan de clase')}</h3><p class="muted">${escapeHtml(plan.grade)} · ${escapeHtml(plan.duration_minutes)} minutos</p></div><div class="row"><button class="soft-btn" data-open-plan="${plan.id}">Ver plan</button><button class="danger-btn" data-delete-plan="${plan.id}" aria-label="Eliminar plan ${escapeHtml(plan.topic)}">Eliminar</button></div></article>`).join('')}</section>`;
   }).join(''):'<div class="empty">No hay planes para esa fecha en esta carpeta. Probá otra fecha o pulsá «Limpiar búsqueda».</div>';
   plans.forEach(plan=>$(`[data-open-plan="${plan.id}"]`).addEventListener('click',()=>openSavedPlan(plan)));
   plans.forEach(plan=>$(`[data-delete-plan="${plan.id}"]`).addEventListener('click',()=>deletePlan(plan)));
@@ -747,7 +752,10 @@ async function openSavedPlan(plan) {
     renderPlanPreview(fallback, body.source || 'guided');
   }
   if ($('#planEditor')) $('#planEditor').value = text || $('#planEditor').value;
-  showPage('crear'); window.scrollTo({ top:0, behavior:'smooth' });
+  $('#savedPlanDocument').append($('#planPreview'));
+  if($('#printBody')) $('#printBody').textContent=text;
+  $('#planPreview .plan-paper')?.classList.toggle('saved-text-only',!!text && text.trim()!==plainPlanText(generatedPlanData).trim());
+  showPage('documento'); window.scrollTo({ top:0, behavior:'smooth' });
 }
 async function deletePlan(plan) {
   if (!confirm(`¿Eliminar el plan «${plan.topic}»? Esta acción no se puede deshacer.`)) return;
