@@ -9,7 +9,7 @@ Asistente de planificación docente con perfil, horario semanal y planes de clas
 - Perfil individual del docente: nombre(s), apellido(s), centro educativo, municipio y grado principal.
 - Horario de lunes a viernes, con varias clases por día.
 - Sugerencia de asignatura, grado y duración del horario al escoger fecha del plan.
-- Generación de un borrador guiado sin servicio de IA, o propuesta con IA cuando se configura una clave segura.
+- Generación local de un borrador guiado sin enviar la información de la clase a un proveedor de IA.
 - Tres momentos de clase con distribución exacta de minutos, ejemplos, dinámicas, evaluación y apoyos.
 - Edición, guardado, búsqueda, apertura, eliminación e impresión del plan a PDF.
 - Datos aislados por cuenta con Row Level Security (RLS).
@@ -31,14 +31,8 @@ Sirve la carpeta `public/` con cualquier servidor estático. La app utiliza Supa
 
 No requiere build ni variables de entorno para publicar la versión web. Configurá en Supabase Auth las URL autorizadas del dominio de Pages, incluida la URL de producción.
 
-## Activar generación con IA
+## IA externa
 
-La aplicación funciona sin API de IA con un borrador guiado local. Para habilitar propuestas generadas por IA:
-
-1. Añadí `OPENAI_API_KEY` como secreto en **Supabase → Edge Functions → Secrets**. La clave nunca se coloca en GitHub ni en `public/app.js`.
-2. Opcionalmente, añadí `OPENAI_MODEL`; por defecto se usa `gpt-4.1-mini`.
-3. Desplegá `supabase/functions/generate-lesson-plan/index.ts` como Edge Function `generate-lesson-plan`, con verificación JWT activada.
-
-La llamada solo ocurre cuando el docente pulsa “Generar planificación”. El proveedor de IA puede cobrar por uso; los créditos de AWS, si se obtienen, no pagan automáticamente una clave de OpenAI.
+La app actualmente prepara el borrador dentro del navegador, sin mandar el contenido de las clases a un servicio externo. El endpoint de IA incluido en `supabase/functions/generate-lesson-plan/` todavía no está desplegado. Para activarlo primero hay que decidir qué proveedor se usará, autorizar el envío de los datos necesarios y definir el límite de gasto; una clave de OpenAI puede generar cargos y no se paga automáticamente con créditos de AWS.
 
 Para una instancia Supabase nueva, aplicá las migraciones en `supabase/migrations/`. No vuelvas a aplicar las migraciones si las tablas ya existen.
