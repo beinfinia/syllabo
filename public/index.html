@@ -26,7 +26,7 @@
     <h1 id="authTitle">Ingresar</h1><p class="tagline">Tu asistente de planificación docente</p>
     <form id="authForm"><div id="nameWrap" class="hidden"><label>Nombre(s) del docente<input name="first_name" autocomplete="given-name"></label><label>Apellido(s) del docente<input name="last_name" autocomplete="family-name"></label></div>
       <label>Correo electrónico<input name="email" type="email" autocomplete="email" required></label><label>Contraseña<input name="password" type="password" minlength="8" autocomplete="current-password" required></label>
-      <div class="auth-actions"><button id="authSubmit" class="primary">Ingresar</button><button type="button" id="toggleAuth" class="link-button">Crear cuenta</button><button type="button" id="forgotPassword" class="link-button">Olvidé mi contraseña</button></div>
+      <div class="auth-actions"><button id="authSubmit" class="primary">Ingresar</button><button type="button" id="toggleAuth" class="link-button">Crear cuenta</button><button type="button" id="forgotPassword" class="link-button">Olvidé mi contraseña</button></div><button type="button" id="resendVerification" class="link-button hidden">Reenviar correo de verificación</button>
     </form><form id="recoveryForm" class="hidden"><label>Nueva contraseña<input name="password" type="password" minlength="8" autocomplete="new-password" required></label><div class="auth-actions"><button class="primary">Guardar contraseña</button></div></form><div id="authStatus" class="status" role="status" aria-live="polite"></div>
   </div></section>
   <div id="app" class="hidden">
