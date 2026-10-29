@@ -20,6 +20,8 @@ let generatedPlanData = null;
 let allPlans = [];
 let pendingSignupEmail = '';
 let currentProfile = null;
+let openingUserId = null;
+let initializedUserId = null;
 let calendarDate = new Date();
 let allCalendarPlans = [];
 let allCalendarEvents = [];
@@ -64,6 +66,8 @@ async function ensureProfile() {
   return created;
 }
 async function openApp(user) {
+  if (initializedUserId === user.id || openingUserId === user.id) return;
+  openingUserId = user.id;
   currentUser = user;
   $('#userEmail').textContent = user.email || '';
   $('#auth').classList.add('hidden'); $('#app').classList.add('hidden');
@@ -71,6 +75,7 @@ async function openApp(user) {
     const profile = await ensureProfile(); currentProfile = profile;
     if (!profile.onboarding_completed) {
       $('#onboarding').classList.remove('hidden');
+      initializedUserId = user.id; openingUserId = null;
       const form = $('#onboardingForm');
       for (const key of ['first_name','last_name']) form.elements[key].value = profile[key] || user.user_metadata?.[key] || '';
       populateGradeChoices(form, profile.modality || '');
@@ -84,7 +89,8 @@ async function openApp(user) {
     if (profile.primary_grade && !$('#planForm').elements.grade.value) $('#planForm').elements.grade.value = profile.primary_grade;
     for (const subject of profile.subjects || []) if (![...$('#subjects').options].some(option=>option.value===subject)) $('#subjects').insertAdjacentHTML('beforeend',`<option>${escapeHtml(subject)}</option>`);
     await loadHome();
-  } catch (err) { $('#auth').classList.remove('hidden'); setStatus('#authStatus', `No se pudo cargar tu perfil: ${friendlyError(err)}`, 'error'); }
+    initializedUserId = user.id; openingUserId = null;
+  } catch (err) { openingUserId = null; $('#auth').classList.remove('hidden'); setStatus('#authStatus', `No se pudo cargar tu perfil: ${friendlyError(err)}`, 'error'); }
 }
 const subjectOptions = ['Lengua y Literatura','Matemáticas','Ciencias Naturales','Estudios Sociales','Educación Física','Convivencia y Civismo','Inglés','Educación Artística','Otra'];
 function populateSubjectChoices(form, selected = []) {
@@ -224,7 +230,7 @@ $('#recoveryForm').addEventListener('submit', async event => {
   else { $('#recoveryForm').classList.add('hidden'); $('#authForm').classList.remove('hidden'); setAuthMode(false); setStatus('#authStatus','Contraseña actualizada. Ya podés ingresar.','ok'); }
 });
 $('#logout').addEventListener('click', async () => {
-  await supabase.auth.signOut(); currentUser = null; currentProfile=null; setAuthMode(false); $('#app').classList.add('hidden'); $('#onboarding').classList.add('hidden'); $('#auth').classList.remove('hidden'); setStatus('#authStatus', 'Sesión cerrada.');
+  await supabase.auth.signOut(); currentUser = null; currentProfile=null; openingUserId=null; initializedUserId=null; setAuthMode(false); $('#app').classList.add('hidden'); $('#onboarding').classList.add('hidden'); $('#auth').classList.remove('hidden'); setStatus('#authStatus', 'Sesión cerrada.');
 });
 
 function splitActivities(plan) {
