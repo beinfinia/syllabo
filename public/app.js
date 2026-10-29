@@ -199,34 +199,20 @@ function formHasRequiredData(data) {
   if (data.duration_minutes < 10 || data.duration_minutes > 600) { $('#planForm').elements.duration_minutes.focus(); return false; }
   return true;
 }
-async function generateDraft(data, teacher) {
-  const { data: aiData, error } = await supabase.functions.invoke('generate-lesson-plan', { body: { ...data, teacher: [teacher.first_name, teacher.last_name].filter(Boolean).join(' '), school: teacher.school_name } });
-  if (error) throw error;
-  if (aiData?.plan && typeof aiData.plan === 'object') {
-    const plan = { ...aiData.plan, ...data, teacher:[teacher.first_name,teacher.last_name].filter(Boolean).join(' '), school:teacher.school_name };
-    plan.text = plainPlanText(plan); return { plan, source:'ai' };
-  }
-  throw new Error(aiData?.error || 'La respuesta de IA no tiene el formato esperado.');
-}
 $('#planForm').addEventListener('submit', async event => {
   event.preventDefault(); const data = getPlanFormData();
   if (!formHasRequiredData(data)) { setStatus('#planStatus', 'Completá los campos requeridos para preparar el plan.', 'error'); return; }
   const button = $('#generatePlan'); button.disabled = true;
-  $('#aiState').innerHTML = '<span class="progress"><span></span></span> Preparando actividades…';
+  $('#aiState').innerHTML = '<span class="progress"><span></span></span> Preparando el borrador en este dispositivo…';
   setStatus('#planStatus', 'Armando la secuencia de clase…');
   try {
     const teacher = await ensureProfile();
-    let result;
-    try { result = await generateDraft(data, teacher); }
-    catch (aiError) {
-      console.info('Syllabo AI unavailable; using guided draft:', aiError.message);
-      result = { plan:localDraft(data, teacher), source:'guided' };
-    }
+    const result = { plan:localDraft(data, teacher), source:'guided' };
     generatedPlanText = result.plan.text;
     generatedPlanData = result.plan;
     renderPlanPreview(result.plan, result.source);
-    $('#aiState').textContent = result.source === 'ai' ? 'Borrador generado con asistencia de IA · revisalo antes de usarlo.' : 'Borrador guiado disponible. La IA se activa al configurar su clave segura.';
-    setStatus('#planStatus', result.source === 'ai' ? 'Tu propuesta de clase está lista para revisar.' : 'Tu borrador está listo. Revisá las actividades antes de guardarlo.', 'ok');
+    $('#aiState').textContent = 'Borrador guiado en este dispositivo. El contenido no se envió a un servicio externo.';
+    setStatus('#planStatus', 'Tu borrador está listo. Revisá las actividades antes de guardarlo.', 'ok');
     currentPlanId = null;
   } catch (err) { setStatus('#planStatus', friendlyError(err), 'error'); $('#aiState').textContent = 'No se pudo generar la propuesta.'; }
   finally { button.disabled = false; }
