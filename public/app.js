@@ -519,16 +519,17 @@ function reviewPlan(event) {
   const data = getPlanFormData();
   if (!data.grade) { setStatus('#planStatus', 'Elegí el grado en Mi perfil antes de preparar el plan.', 'error'); return; }
   if (!formHasRequiredData(data)) { setStatus('#planStatus', 'Completá la asignatura, la fecha, el contenido y el indicador.', 'error'); return; }
-  pendingPlanData = data;
   const profile = currentProfile || {};
+  pendingPlanData = { ...data, student_age_range: profile.teacher_context?.student_age_range || '', modality: profile.modality || '' };
   const summary = [
-    ['Asignatura', data.subject], ['Modalidad', profile.modality || '—'], ['Grado del perfil', data.grade],
-    ['Edad del grupo', profile.teacher_context?.student_age_range || 'No indicada'],
+    ['Asignatura', data.subject], ['Modalidad', profile.modality || '—'], ['Grado de esta clase', data.grade],
+    ['Rango de edad del grupo', pendingPlanData.student_age_range || 'No indicado: la IA usará el grado como referencia'],
     ['Fecha', prettyDate(data.lesson_date)], ['Duración', `${data.duration_minutes} minutos`],
     ['Contenido', data.content], ['Indicador de logro', data.achievement_indicator],
     ['Sugerencia u observación', data.additional_observation || 'Ninguna'],
     ['Recursos del perfil', data.resources || 'Sin recursos marcados; se sugerirán materiales básicos.'],
-    ['Criterios de evaluación', 'La IA los propondrá a partir del indicador.']
+    ['Criterios de evaluación', 'La IA los propondrá a partir del indicador.'],
+    ['Revisión del dictado', 'La IA interpretará errores leves por contexto. Si una palabra cambia el tema y es ambigua, pedirá que la revisés.']
   ];
   $('#planReviewDetails').innerHTML = summary.map(([label, value]) => `<div><b>${escapeHtml(label)}:</b> ${escapeHtml(value)}</div>`).join('');
   $('#planForm').classList.add('hidden');
@@ -546,14 +547,14 @@ $('#generatePlan').addEventListener('click', async () => {
   setStatus('#planStatus', 'Enviando los datos del plan a la IA…');
   try {
     const teacher = await ensureProfile();
-    const data = { ...pendingPlanData, grade:planningGradeOverride || teacher.primary_grade || '' };
+    const data = { ...pendingPlanData, grade:pendingPlanData.grade || teacher.primary_grade || '' };
     if (!data.grade) throw new Error('Seleccioná el grado en Mi perfil para continuar.');
     data.evaluation_criteria = suggestEvaluationCriteria(data);
     const { data: response, error } = await supabase.functions.invoke('generate-lesson-plan', {
       body: {
         ...data,
-        modality: teacher.modality || '',
-        student_age_range: teacher.teacher_context?.student_age_range || '',
+        modality: data.modality || teacher.modality || '',
+        student_age_range: data.student_age_range || '',
         available_resources: teacher.teacher_context?.available_resources || [],
         planning_challenges: teacher.teacher_context?.planning_challenges || '',
         preferred_dynamics: teacher.teacher_context?.preferred_dynamics || '',
@@ -568,7 +569,7 @@ $('#generatePlan').addEventListener('click', async () => {
       ...response.plan,
       teacher: [teacher.first_name, teacher.last_name].filter(Boolean).join(' '),
       school: teacher.school_name || '',
-      student_age_range: teacher.teacher_context?.student_age_range || '',
+      student_age_range: data.student_age_range || '',
       additional_observation: data.additional_observation
     };
     const result = { plan:aiPlan, source:'ai' };
@@ -582,9 +583,15 @@ $('#generatePlan').addEventListener('click', async () => {
     currentPlanId = null;
   } catch (err) {
     const reason = await functionErrorMessage(err);
+    if (/Revisá el dictado:/i.test(reason)) {
+      $('#planReview').classList.add('hidden'); $('#planForm').classList.remove('hidden');
+      $('#planPreview').innerHTML=''; generatedPlanData=null; generatedPlanText='';
+      $('#aiState').textContent='Revisá la palabra indicada antes de generar.';
+      setStatus('#planStatus',reason,'error'); return;
+    }
     try {
       const teacher = await ensureProfile();
-      const data = { ...pendingPlanData, grade:planningGradeOverride || teacher.primary_grade || '' };
+      const data = { ...pendingPlanData, grade:pendingPlanData.grade || teacher.primary_grade || '' };
       data.evaluation_criteria = suggestEvaluationCriteria(data);
       const fallback = localDraft(data, teacher);
       fallback.additional_observation = data.additional_observation;
