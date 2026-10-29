@@ -170,7 +170,7 @@ input:focus,select:focus,textarea:focus{background:#fff;border-color:#7391e7;box
 .saved-reader-toolbar{display:flex;align-items:center;gap:15px;margin-bottom:18px;color:var(--muted);font-size:13px}.saved-plan-view .editor-block,.saved-plan-view #savePlan{display:none!important}.saved-plan-view .plan-paper{margin-top:0}@media(max-width:720px){.saved-reader-toolbar{gap:12px}.saved-reader-toolbar button{font-size:13px}.saved-plan-view .plan-paper{border:0;border-radius:20px}}@media print{.page#documento{display:block!important}.saved-reader-toolbar{display:none!important}}
 .saved-plan-view .saved-text-only .print-body{display:block;white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.6}.saved-plan-view .saved-text-only .print-structured{display:none}
 </style>
-<link rel="manifest" href="./manifest.webmanifest"><link rel="stylesheet" href="./mobile.css?v=20261029-avatars-v2"></head>
+<link rel="manifest" href="./manifest.webmanifest"><link rel="stylesheet" href="./mobile.css?v=20261029-modern-selector-v1"></head>
 <body>
   <section id="auth" class="auth-wrap"><div class="auth-card">
     <div class="brand" style="margin-bottom:17px"><img class="mark" src="./logo.svg" alt="">Syllabo</div>
@@ -194,7 +194,7 @@ input:focus,select:focus,textarea:focus{background:#fff;border-color:#7391e7;box
       </section>
       <section id="crear" class="page hidden"><div class="card"><div class="section-title"><div><div class="eyebrow">Plan de clase</div><h1>Prepará tu próxima clase</h1><p class="muted">Escribí o dictá los datos de tu clase. Después revisalos y generá tu plan.</p></div></div>
         <div class="section-hint">Tu grado y tus recursos ya vienen del perfil. Tocá «Dictar» debajo de cada cuadro si preferís hablar. Podés corregir el texto antes de continuar.</div>
-        <ol class="creation-steps" aria-label="Pasos para crear un plan"><li>Completá</li><li>Revisá</li><li>Generá y guardá</li></ol><form id="planForm" class="grid"><label>Asignatura<select id="planSubjectInput" name="subject" required><option value="">Elegí una materia de tu perfil</option></select></label>
+        <ol class="creation-steps" aria-label="Pasos para crear un plan"><li>Completá</li><li>Revisá</li><li>Generá y guardá</li></ol><form id="planForm" class="grid"><div class="subject-field"><label id="subjectFieldLabel" for="planSubjectInput">Asignatura</label><select id="planSubjectInput" name="subject" required><option value="">Elegí una materia de tu perfil</option></select><button type="button" id="chooseSubject" class="subject-trigger hidden" aria-haspopup="dialog" aria-controls="subjectDialog" aria-labelledby="subjectFieldLabel subjectTriggerText"><span class="subject-trigger-icon" aria-hidden="true">▤</span><span id="subjectTriggerText">Elegí una asignatura</span><span aria-hidden="true">⌄</span></button></div>
 
           <label>Fecha de la clase<input name="lesson_date" type="date" required></label>
           <div class="field-control"><label class="field-label" for="planContent">Contenido a desarrollar</label><div class="voice-control"><textarea id="planContent" name="content" required placeholder="Dictá o escribí el contenido que vas a desarrollar"></textarea><button type="button" class="dictate-button" data-dictate="planContent"><img class="icon" src="./icons/mic.svg" alt=""><span>Dictar</span></button></div></div>
@@ -213,8 +213,8 @@ input:focus,select:focus,textarea:focus{background:#fff;border-color:#7391e7;box
   <aside class="device-access"><p id="connectionStatus" role="status">Guardá tus PDF para consultarlos sin internet.</p><button type="button" class="soft-btn" data-open-offline>Mis PDF sin internet</button></aside>
   <section id="offlinePanel" hidden aria-labelledby="offlineTitle"><div class="offline-inner"><button type="button" id="closeOffline" class="soft-btn">← Volver</button><h1 id="offlineTitle">Mis PDF sin internet</h1><p>Copias guardadas en este teléfono. Se pueden abrir sin iniciar sesión. Si compartís el dispositivo, quitá las copias al terminar. Borrar los datos del navegador elimina estas copias; conservá también la descarga.</p><p id="offlineStatus" role="status"></p><div id="offlineList"></div><button type="button" id="clearOffline" class="text-btn">Quitar todas las copias del teléfono</button></div></section>
   <script type="module" src="./offline.js"></script>
-  <script src="./ui.js?v=20261029-avatars-v2"></script>
-  <script type="module" src="./app.js?v=20261029-avatars-v2"></script>
-</body></html>
+  <script src="./ui.js?v=20261029-modern-selector-v1"></script>
+  <script type="module" src="./app.js?v=20261029-modern-selector-v1"></script>
+<dialog id="subjectDialog" class="subject-dialog" aria-labelledby="subjectDialogTitle"><div class="subject-dialog-head"><div><span class="eyebrow">Tu próxima clase</span><h2 id="subjectDialogTitle">Elegí la asignatura</h2></div><button id="closeSubjectDialog" type="button" class="soft-btn" aria-label="Cerrar selector">✕</button></div><label for="subjectDialogSearch" class="sr-only">Buscar asignatura</label><input id="subjectDialogSearch" type="search" placeholder="Buscar asignatura…" autocomplete="off"><div id="subjectDialogOptions" class="subject-dialog-options" role="group" aria-label="Asignaturas disponibles"></div><p id="subjectDialogStatus" class="muted" role="status"></p></dialog></body></html>
 
 

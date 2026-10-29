@@ -204,9 +204,34 @@ function populatePlanSubjectOptions(profile, selected = '') {
   const select=$('#planSubjectInput'); const subjects=window.SyllaboSubjects.unique(profile?.subjects||[]); const value=selected||select.value;
   select.innerHTML='<option value="">Elegí una materia de tu perfil</option>'+subjects.map(subject=>`<option value="${escapeHtml(subject)}">${escapeHtml(subject)}</option>`).join('');
   if(value&&!subjects.includes(value))select.insertAdjacentHTML('beforeend',`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`);
-  select.value=value||'';
+  select.value=value||''; syncSubjectTrigger();
 }
-function setPlanSubject(value) { const select=$('#planSubjectInput'); if(![...select.options].some(option=>option.value===value))select.insertAdjacentHTML('beforeend',`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`);select.value=value; }
+function setPlanSubject(value) { const select=$('#planSubjectInput'); if(![...select.options].some(option=>option.value===value))select.insertAdjacentHTML('beforeend',`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`);select.value=value; syncSubjectTrigger(); }
+
+function sentenceCase(value='') {
+  return String(value).replace(/(^\s*|[.!?]\s+|\n\s*|:\s+)([a-záéíóúüñ])/g,(_,prefix,letter)=>prefix+letter.toLocaleUpperCase('es'));
+}
+function syncSubjectTrigger(){const field=$('#planSubjectInput');$('#subjectTriggerText').textContent=field.value||'Elegí una asignatura';}
+function renderSubjectOptions(){
+  const term=window.SyllaboSubjects.normalizeName($('#subjectDialogSearch').value);
+  const options=[...$('#planSubjectInput').options].filter(o=>o.value&&(!term||window.SyllaboSubjects.normalizeName(o.textContent).includes(term)));
+  $('#subjectDialogOptions').innerHTML=options.map((option,index)=>`<button type="button" class="subject-option" style="--subject-tone:${['#e8e8ff','#e1f3ed','#fff0db','#f9e4f0'][index%4]}" data-subject-choice="${escapeHtml(option.value)}" aria-pressed="${option.value===$('#planSubjectInput').value}"><span class="subject-option-mark" aria-hidden="true">▤</span><span>${escapeHtml(option.textContent)}</span><span class="subject-option-check" aria-hidden="true">${option.value===$('#planSubjectInput').value?'✓':'›'}</span></button>`).join('');
+  $('#subjectDialogStatus').textContent=options.length?`${options.length} asignaturas disponibles`:'No hay coincidencias. Revisá tus asignaturas en Perfil.';
+  $('#subjectDialogOptions').querySelectorAll('[data-subject-choice]').forEach(button=>button.addEventListener('click',()=>{setPlanSubject(button.dataset.subjectChoice);$('#planSubjectInput').dispatchEvent(new Event('change',{bubbles:true}));$('#subjectDialog').close();$('#chooseSubject').focus();}));
+}
+if(typeof $('#subjectDialog').showModal==='function'){
+  $('#planSubjectInput').classList.add('hidden');$('#planSubjectInput').required=false;$('#chooseSubject').classList.remove('hidden');
+  $('#chooseSubject').addEventListener('click',()=>{$('#subjectDialogSearch').value='';renderSubjectOptions();$('#subjectDialog').showModal();$('#subjectDialogSearch').focus();});
+  $('#closeSubjectDialog').addEventListener('click',()=>$('#subjectDialog').close());
+  $('#subjectDialogSearch').addEventListener('input',renderSubjectOptions);
+  $('#planSubjectInput').addEventListener('change',syncSubjectTrigger);
+  $('#planForm').addEventListener('reset',()=>queueMicrotask(syncSubjectTrigger));
+}
+for(const field of ['content','achievement_indicator','additional_observation']){
+  const el=$('#planForm').elements[field];
+  el.setAttribute('autocapitalize','sentences');
+  el.addEventListener('blur',()=>{el.value=sentenceCase(el.value);});
+}
 function updatePlanAgeHint(profile) {
   const grade = planningGradeOverride || profile?.primary_grade || 'grado de tu perfil';
   const range = profile?.teacher_context?.student_age_range || '';
@@ -397,7 +422,7 @@ function plainPlanText(plan) {
   if(plan.glossary?.length) { lines.push('', 'GLOSARIO DOCENTE'); plan.glossary.forEach(entry=>lines.push(`${entry.term}: ${entry.definition}`)); }
   if(plan.extension) lines.push('', 'RETO OPCIONAL DE AMPLIACIÓN', plan.extension);
   lines.push('', 'Borrador para revisión docente. Ajustar ejemplos y ficha al programa de estudio y a las características del grupo.');
-  return lines.join('\n');
+  return sentenceCase(lines.join('\n'));
 }
 function suggestEvaluationCriteria(data) {
   return [
@@ -516,6 +541,7 @@ function localDraft(data, teacher) {
 }
 function getPlanFormData() {
   const data = Object.fromEntries(new FormData($('#planForm')).entries());
+  for(const field of ['content','achievement_indicator','additional_observation']) {data[field]=sentenceCase(data[field]||'');$('#planForm').elements[field].value=data[field];}
   data.duration_minutes = Number(data.duration_minutes);
   data.grade = planningGradeOverride || currentProfile?.primary_grade || '';
   data.topic = derivePlanTitle(data.content);
@@ -628,6 +654,8 @@ $('#generatePlan').addEventListener('click', async () => {
   finally { button.disabled = false; }
 });
 function renderPlanPreview(plan, source = 'guided') {
+  plan = {...plan};
+  for(const key of ['content','achievement_indicator','objective','preparation','answer_guide','teacher_explanation','differentiation','extension','teacher_note']) if(plan[key])plan[key]=sentenceCase(plan[key]);
   const structuredText=plainPlanText(plan);
   const text=plan.text||structuredText;
   generatedPlanText=text;
