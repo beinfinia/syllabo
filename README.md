@@ -28,14 +28,13 @@ El esquema aplicado a Supabase está versionado en `supabase/migrations/`. Las t
 
 ## Desarrollo local
 
-Sirve la carpeta `public/` con cualquier servidor estático. La app utiliza Supabase JS v2 desde esm.sh. La URL del proyecto y la clave publicable están en `public/app.js`; la clave publicable puede estar en el navegador con RLS activo. Nunca agregues una `sb_secret`, `service_role` ni una clave de proveedor de IA al frontend.
+Sirve la carpeta `public/` con cualquier servidor estático. La app utiliza Supabase JS v2 desde esm.sh y cuenta con jsDelivr como respaldo para cargar el cliente. La URL del proyecto y la clave publicable están en `public/app.js`; la clave publicable puede estar en el navegador con RLS activo. Nunca agregues una `sb_secret`, `service_role` ni una clave de proveedor de IA al frontend.
 
 ## Publicación en Cloudflare Pages
 
-- Framework preset: `None`
-- Build command: `exit 0`
-- Build output directory: `public`
-- Root directory: raíz del repositorio
+- El archivo `wrangler.toml` fija el proyecto `syllabo-7hj` y la carpeta pública `./public` como salida del despliegue.
+- En Cloudflare Pages, usá el preset `None`, comando `exit 0` y directorio de salida `public`; el directorio raíz es la raíz del repositorio.
+- `public/_headers` fuerza la revalidación para que HTML y JavaScript no sigan sirviendo una versión anterior desde caché.
 
 No requiere build ni variables de entorno para publicar la versión web. Configurá en Supabase Auth las URL autorizadas del dominio de Pages, incluida la URL de producción.
 

@@ -1,9 +1,23 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.2';
-
 const SUPABASE_URL = 'https://rrptfgdshlrfongkfppv.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_VIbLFUuvaksiYulO8-CuCQ_zRY92zUp';
 const PRODUCTION_APP_URL = 'https://syllabo.beinfinia.com/';
-const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+let supabase = null;
+let supabaseLoadError = null;
+async function loadSupabaseModule(url) {
+  let timeoutId;
+  try {
+    return await Promise.race([
+      import(url),
+      new Promise((_, reject) => { timeoutId = setTimeout(() => reject(new Error('Tiempo agotado cargando el servicio de datos.')), 7000); })
+    ]);
+  } finally { clearTimeout(timeoutId); }
+}
+try {
+  let module;
+  try { module = await loadSupabaseModule('https://esm.sh/@supabase/supabase-js@2.112.2'); }
+  catch { module = await loadSupabaseModule('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/+esm'); }
+  supabase = module.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+} catch (error) { supabaseLoadError = error; }
 const $ = (selector) => document.querySelector(selector);
 const iconMarkup = (name) => `<img class="icon" src="./icons/${name}.svg" alt="">`;
 const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
@@ -245,7 +259,7 @@ function startDictation(button) {
   recognition.onend=()=>{button.classList.remove('listening');button.innerHTML=`${iconMarkup('mic')}<span>Dictar</span>`;button.setAttribute('aria-pressed','false');if(activeRecognition===recognition)activeRecognition=null;};
   try{recognition.start();}catch{button.classList.remove('listening');button.innerHTML=`${iconMarkup('mic')}<span>Dictar</span>`;button.setAttribute('aria-pressed','false');activeRecognition=null;setStatus('#planStatus','No se pudo iniciar el micrófono. Esperá un momento e intentá de nuevo.','error');}
 }
-document.querySelectorAll('[data-dictate]').forEach(button=>button.addEventListener('click',()=>startDictation(button)));
+document.querySelectorAll('[data-dictate]').forEach(button=>{if(!button.dataset.uiFallback)button.addEventListener('click',()=>startDictation(button));});
 $('#onboardingForm').addEventListener('submit', async event => {
   event.preventDefault(); const button=$('#finishOnboarding'); button.disabled=true; setStatus('#onboardingStatus','Guardando tu perfil…');
   try { await saveTeacherProfile(event.currentTarget,true); }
@@ -333,7 +347,7 @@ $('#recoveryForm').addEventListener('submit', async event => {
   finally { button.disabled = false; }
 });
 $('#cancelRecovery').addEventListener('click', async () => {
-  recoveringPassword = false; await supabase.auth.signOut(); history.replaceState(null, '', `${location.pathname}${location.search}`);
+  recoveringPassword = false; if (supabase) await supabase.auth.signOut(); history.replaceState(null, '', `${location.pathname}${location.search}`);
   $('#recoveryForm').reset(); $('#recoveryForm').classList.add('hidden'); $('#authForm').classList.remove('hidden'); setAuthMode(false); setStatus('#authStatus','Podés ingresar con tu correo y contraseña.');
 });
 $('#logout').addEventListener('click', async () => {
@@ -474,7 +488,9 @@ $('#newPlan').addEventListener('click', () => {
 
 async function loadPlans() {
   $('#plansList').innerHTML = '<div class="empty">Cargando tus planes…</div>';
-  const { data, error } = await supabase.from('lesson_plans').select('id,subject,grade,topic,lesson_date,content,achievement_indicator,evaluation_criteria,duration_minutes,resources,plan_body,created_at').order('lesson_date', { ascending:false }).order('created_at', { ascending:false });
+  let data, error;
+  try { ({ data, error } = await supabase.from('lesson_plans').select('id,subject,grade,topic,lesson_date,content,achievement_indicator,evaluation_criteria,duration_minutes,resources,plan_body,created_at').order('lesson_date', { ascending:false }).order('created_at', { ascending:false })); }
+  catch (err) { $('#plansList').innerHTML = `<div class="empty">${escapeHtml(friendlyError(err))}</div>`; return; }
   if (error) { $('#plansList').innerHTML = `<div class="empty">${escapeHtml(friendlyError(error))}</div>`; return; }
   allPlans = data || []; populatePlanMonths(allPlans); populatePlanSubjects(allPlans); renderPlanList();
 }
@@ -518,7 +534,7 @@ async function deletePlan(plan) {
   if (error) alert(friendlyError(error)); else { await loadPlans(); await loadHome(); }
 }
 
-$('#establishSchedule').addEventListener('click', () => {
+if (!$('#establishSchedule').dataset.uiFallback) $('#establishSchedule').addEventListener('click', () => {
   const form=$('#scheduleForm'); form.classList.toggle('hidden');
   $('#establishSchedule').textContent=form.classList.contains('hidden')?'Establecer horario':'Cerrar formulario';
   if(!form.classList.contains('hidden')) form.elements.subject.focus();
@@ -563,8 +579,8 @@ $('#calendarView').addEventListener('change',renderCalendar);
 $('#calendarPrev').addEventListener('click',()=>{const view=$('#calendarView').value;if(view==='month')calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()-1,1,12);else calendarDate.setDate(calendarDate.getDate()-(view==='week'?7:1));loadCalendar();});
 $('#calendarNext').addEventListener('click',()=>{const view=$('#calendarView').value;if(view==='month')calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,1,12);else calendarDate.setDate(calendarDate.getDate()+(view==='week'?7:1));loadCalendar();});
 $('#calendarToday').addEventListener('click',()=>{calendarDate=new Date();loadCalendar();});
-$('#newCalendarEvent').addEventListener('click',()=>openCalendarEventForm({start_date:dateKey(calendarDate)}));
-$('#cancelCalendarEvent').addEventListener('click',()=>$('#calendarEventFormWrap').classList.add('hidden'));
+if (!$('#newCalendarEvent').dataset.uiFallback) $('#newCalendarEvent').addEventListener('click',()=>openCalendarEventForm({start_date:dateKey(calendarDate)}));
+if (!$('#cancelCalendarEvent').dataset.uiFallback) $('#cancelCalendarEvent').addEventListener('click',()=>$('#calendarEventFormWrap').classList.add('hidden'));
 $('#calendarEventForm').addEventListener('submit',async event=>{
   event.preventDefault();const data=Object.fromEntries(new FormData(event.currentTarget).entries());const id=data.id;delete data.id;
   data.start_time=data.start_time||null;data.end_date=data.end_date||null;data.updated_at=new Date().toISOString();
@@ -639,7 +655,9 @@ $('#profileForm').addEventListener('submit', async event => {
   catch(error) { setStatus('#profileStatus',friendlyError(error),'error'); }
 });
 async function loadProfile() {
-  const {data,error}=await supabase.from('teacher_profiles').select('*').eq('id',currentUser.id).maybeSingle();
+  let data,error;
+  try { ({data,error}=await supabase.from('teacher_profiles').select('*').eq('id',currentUser.id).maybeSingle()); }
+  catch(err) { setStatus('#profileStatus',friendlyError(err),'error'); return; }
   if(error){setStatus('#profileStatus',friendlyError(error),'error');return;}
   if(data){currentProfile=data;fillTeacherForm($('#profileForm'),data);}
 }
@@ -675,13 +693,6 @@ function showRecoveryForm() {
   setStatus('#authStatus','Elegí una contraseña nueva de al menos 8 caracteres.');
   requestAnimationFrame(() => $('#recoveryForm').elements.password.focus());
 }
-if (recoveringPassword) showRecoveryForm();
-supabase.auth.onAuthStateChange((event, session) => {
-  if (event === 'PASSWORD_RECOVERY') { showRecoveryForm(); return; }
-  if (session?.user && !recoveringPassword && $('#app').classList.contains('hidden')) setTimeout(() => openApp(session.user), 0);
-});
-const { data:{ session } } = await supabase.auth.getSession();
-if (session?.user && !recoveringPassword && $('#app').classList.contains('hidden')) await openApp(session.user);
 $('#planForm').elements.lesson_date.value = localISODate();
 $('#planForm').elements.lesson_date.addEventListener('change', async event => {
   if (!currentUser || !event.target.value) return;
@@ -694,3 +705,17 @@ $('#planForm').elements.lesson_date.addEventListener('change', async event => {
   if (!form.elements.grade.value) form.elements.grade.value = selected.grade;
   if (!form.elements.duration_minutes.value || form.elements.duration_minutes.value === '45') form.elements.duration_minutes.value = selected.duration_minutes;
 });
+window.syllaboAppReady = true;
+if (recoveringPassword) showRecoveryForm();
+if (!supabase) {
+  setStatus('#authStatus', 'No se pudo cargar el servicio de acceso y datos. Revisá tu conexión y recargá la página.', 'error');
+} else {
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') { showRecoveryForm(); return; }
+    if (session?.user && !recoveringPassword && $('#app').classList.contains('hidden')) setTimeout(() => openApp(session.user), 0);
+  });
+  try {
+    const { data:{ session } } = await supabase.auth.getSession();
+    if (session?.user && !recoveringPassword && $('#app').classList.contains('hidden')) await openApp(session.user);
+  } catch (error) { setStatus('#authStatus', `No se pudo restaurar tu sesión: ${friendlyError(error)}`, 'error'); }
+}

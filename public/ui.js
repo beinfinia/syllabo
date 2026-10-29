@@ -1,0 +1,124 @@
+// Keep essential interface controls responsive even while the data client loads.
+(() => {
+  const $ = (selector) => document.querySelector(selector);
+  const icon = (name) => `<img class="icon" src="./icons/${name}.svg" alt="">`;
+  const dateToday = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  };
+
+  document.querySelectorAll('[data-password-toggle]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const input = document.getElementById(button.dataset.passwordToggle);
+      if (!input) return;
+      const visible = input.type === 'password';
+      input.type = visible ? 'text' : 'password';
+      button.innerHTML = `${icon(visible ? 'eye-off' : 'eye')}<span>${visible ? 'Ocultar' : 'Mostrar'}</span>`;
+      button.setAttribute('aria-pressed', String(visible));
+      button.setAttribute('aria-label', visible ? 'Ocultar contraseña' : 'Mostrar contraseña');
+    });
+  });
+
+  const establishSchedule = $('#establishSchedule');
+  if (establishSchedule) {
+    establishSchedule.dataset.uiFallback = 'true';
+    establishSchedule.addEventListener('click', () => {
+      const form = $('#scheduleForm');
+      form.classList.toggle('hidden');
+      establishSchedule.textContent = form.classList.contains('hidden') ? 'Establecer horario' : 'Cerrar formulario';
+      if (!form.classList.contains('hidden')) form.elements.subject.focus();
+    });
+  }
+
+  const newEvent = $('#newCalendarEvent');
+  if (newEvent) {
+    newEvent.dataset.uiFallback = 'true';
+    newEvent.addEventListener('click', () => {
+      const form = $('#calendarEventForm');
+      form.reset();
+      form.elements.start_date.value = dateToday();
+      $('#eventFormTitle').textContent = 'Agregar actividad o feriado';
+      $('#calendarEventFormWrap').classList.remove('hidden');
+      form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }
+  const cancelEvent = $('#cancelCalendarEvent');
+  if (cancelEvent) {
+    cancelEvent.dataset.uiFallback = 'true';
+    cancelEvent.addEventListener('click', () => $('#calendarEventFormWrap').classList.add('hidden'));
+  }
+
+  document.querySelectorAll('[data-dictate]').forEach((button) => {
+    button.dataset.uiFallback = 'true';
+    button.addEventListener('click', () => {
+      const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const status = $('#planStatus');
+      if (!Recognition) {
+        status.textContent = 'El dictado de voz no está disponible en este navegador. En Chrome, permití el micrófono o usá el dictado del teclado.';
+        status.className = 'status error';
+        return;
+      }
+      if (button.dataset.listening === 'true') {
+        button._recognition?.stop?.();
+        return;
+      }
+      const field = document.getElementById(button.dataset.dictate);
+      if (!field) return;
+      const recognition = new Recognition();
+      button._recognition = recognition;
+      button.dataset.listening = 'true';
+      recognition.lang = 'es-MX';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      button.classList.add('listening');
+      button.innerHTML = `${icon('mic')}<span>Escuchando…</span>`;
+      button.setAttribute('aria-pressed', 'true');
+      status.textContent = 'Hablá ahora; al terminar, el texto aparecerá en el campo.';
+      status.className = 'status';
+      recognition.onresult = (event) => {
+        const spoken = event.results?.[0]?.[0]?.transcript?.trim();
+        if (!spoken) return;
+        field.value = `${field.value.trim()}${field.value.trim() ? ' ' : ''}${spoken}`;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+      };
+      recognition.onerror = (event) => {
+        const messages = {
+          'not-allowed': 'Permití el uso del micrófono desde la configuración del navegador.',
+          'service-not-allowed': 'El navegador bloqueó el servicio de dictado.',
+          'no-speech': 'No detecté voz. Intentá de nuevo.',
+          network: 'El dictado necesita conexión a internet.',
+          'audio-capture': 'No encontré un micrófono disponible.',
+          'language-not-supported': 'El navegador no admite el idioma de dictado.'
+        };
+        status.textContent = messages[event.error] || 'No se pudo iniciar el dictado. Revisá el micrófono e intentá de nuevo.';
+        status.className = 'status error';
+      };
+      recognition.onend = () => {
+        button.classList.remove('listening');
+        button.innerHTML = `${icon('mic')}<span>Dictar</span>`;
+        button.setAttribute('aria-pressed', 'false');
+        button.dataset.listening = 'false';
+        button._recognition = null;
+      };
+      try { recognition.start(); }
+      catch {
+        button.classList.remove('listening');
+        button.innerHTML = `${icon('mic')}<span>Dictar</span>`;
+        button.setAttribute('aria-pressed', 'false');
+        button.dataset.listening = 'false';
+        status.textContent = 'No se pudo activar el micrófono. Esperá un momento y probá de nuevo.';
+        status.className = 'status error';
+      }
+    });
+  });
+
+  document.addEventListener('click', (event) => {
+    if (window.syllaboAppReady) return;
+    const tab = event.target.closest('.tab[data-page]');
+    const goto = event.target.closest('[data-goto]');
+    const page = tab?.dataset.page || goto?.dataset.goto;
+    if (!page) return;
+    document.querySelectorAll('.page').forEach((section) => section.classList.toggle('hidden', section.id !== page));
+    document.querySelectorAll('.tab').forEach((button) => button.classList.toggle('active', button.dataset.page === page));
+  });
+})();
