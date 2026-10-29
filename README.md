@@ -33,7 +33,9 @@ No requiere build ni variables de entorno para publicar la versión web. Configu
 
 ## Verificación por correo
 
-La URL de retorno de registro y recuperación es `https://syllabo-7hj.pages.dev/`, incluso si la cuenta se creó desde `localhost`. En **Supabase → Authentication → URL Configuration**, poné esa dirección como **Site URL** y agregala a **Redirect URLs**. Supabase debe permitir la redirección para que el enlace abra el sitio publicado.
+La URL oficial de retorno de registro y recuperación es `https://syllabo.beinfinia.com/`, incluso si la cuenta se creó desde `localhost`. En **Supabase → Authentication → URL Configuration**, poné esa dirección como **Site URL** y agregala a **Redirect URLs**. También conectá el dominio personalizado a Cloudflare Pages. Supabase debe permitir la redirección para que el enlace abra el sitio publicado.
+
+Si ya se creó una cuenta pero su enlace anterior apunta a `localhost`, desde la pantalla de acceso se puede escribir el correo y usar **Reenviar correo de verificación** para recibir un enlace nuevo.
 
 El remitente puede seguir apareciendo como Supabase mientras se use el correo SMTP predeterminado. Para que el correo diga Syllabo hace falta configurar SMTP propio en Supabase Auth y un remitente/dominio verificado; cambiar solo la plantilla no cambia el proveedor del remitente.
 
