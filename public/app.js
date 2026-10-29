@@ -681,7 +681,7 @@ function renderPlanPreview(plan, source = 'guided') {
     } catch(error) {setStatus('#saveStatus',error.message || 'No se pudo guardar el PDF. Revisá el espacio disponible.','error');}
     finally {button.disabled=false;}
   });
-  $('#printPlan').addEventListener('click',()=>{generatedPlanText=$('#planEditor').value;const paper=$('#planPreview .plan-paper');const edited=generatedPlanText.trim()!==structuredText.trim();paper.classList.toggle('print-text-only',edited);$('#printBody').textContent=generatedPlanText;window.print();paper.classList.remove('print-text-only');});
+  $('#printPlan').addEventListener('click',()=>{generatedPlanText=$('#planEditor').value;const paper=$('#planPreview .plan-paper');const edited=!paper.classList.contains('legacy-formatted')&&generatedPlanText.trim()!==structuredText.trim();paper.classList.toggle('print-text-only',edited);$('#printBody').textContent=generatedPlanText;window.print();paper.classList.remove('print-text-only');});
   $('#discardPlan').addEventListener('click',()=>{$('#planPreview').innerHTML='';currentPlanId=null;generatedPlanText='';generatedPlanData=null;if($('#savedPlanDocument')?.contains($('#planPreview')))showPage('planes');});
 }
 async function saveCurrentPlan() {
@@ -773,6 +773,31 @@ $('#plansRoot').addEventListener('click',returnToPlanFolders);
 $('#planExactDate').addEventListener('change',()=>{if($('#planExactDate').value)$('#planMonth').value='';renderPlanList();});
 $('#clearPlanFilters').addEventListener('click',()=>{$('#planSearch').value='';$('#planMonth').value='';$('#planExactDate').value='';renderPlanList();});
 $('#planSearch').addEventListener('input',renderPlanList); $('#planMonth').addEventListener('change',()=>{$('#planExactDate').value='';renderPlanList();});
+
+function formatSavedPlanText(text) {
+  const lines=String(text||'').replace(/\r/g,'').split('\n');
+  const meta=[],sections=[];let current=null;let title='Plan de clase';
+  const headingPattern=/^(?:\d+[.)]\s*)?(?:PROP[ÓO]SITO(?: DE APRENDIZAJE)?|OBJETIVO|INDICADOR DE LOGRO|RECURSOS(?: Y PREPARACI[ÓO]N)?|PREPARACI[ÓO]N|SECUENCIA DID[ÁA]CTICA|INICIO|DESARROLLO|CIERRE|FICHA(?: DE TRABAJO| Y EVALUACI[ÓO]N)?|EVALUACI[ÓO]N|LISTA DE COTEJO(?: PARA LA DOCENTE)?|RESPUESTAS(?: ORIENTATIVAS Y APOYO)?|GU[ÍI]A CONCEPTUAL PARA EL DOCENTE|EJEMPLOS RESUELTOS|GLOSARIO(?: DOCENTE)?|RETO OPCIONAL DE AMPLIACI[ÓO]N|ADECUACI[ÓO]N|TAREA)(?:\s*[|·(].*)?\s*:?$/i;
+  const labels=/^(Docente|Centro educativo|Asignatura|Grado|Edad de referencia|Fecha|Duración)\s*:/i;
+  function section(name){current={name,lines:[]};sections.push(current);}
+  for(const raw of lines){
+    const value=raw.trim();if(!value)continue;
+    if(/^PLAN DE CLASE(?:\s*[|·:]|$)/i.test(value)){title=value.replace(/^PLAN DE CLASE/i,'Plan de clase');continue;}
+    if(labels.test(value)&&!sections.length){
+      const parts=value.split(/\s*[·|]\s*(?=(?:Docente|Centro educativo|Asignatura|Grado|Edad de referencia|Fecha|Duración)\s*:)/i);
+      meta.push(...parts);continue;
+    }
+    if(headingPattern.test(value)){section(sentenceCase(value.replace(/:$/,'')));continue;}
+    if(!current)section('Contenido y aprendizaje');
+    current.lines.push(value);
+  }
+  const paragraph=value=>{
+    const match=value.match(/^([^:]{2,85}):\s*([\s\S]*)$/);
+    return match?`<p><b>${escapeHtml(sentenceCase(match[1]))}:</b> ${escapeHtml(sentenceCase(match[2]))}</p>`:`<p>${escapeHtml(sentenceCase(value))}</p>`;
+  };
+  return `<div class="plan-heading"><p class="eyebrow">Documento guardado</p><h2>${escapeHtml(sentenceCase(title))}</h2></div>${meta.length?`<div class="plan-meta">${meta.map(value=>`<div>${paragraph(value)}</div>`).join('')}</div>`:''}${sections.map(section=>`<section class="plan-block legacy-plan-section"><h3>${escapeHtml(section.name)}</h3>${section.lines.map(paragraph).join('')}</section>`).join('')}`;
+}
+
 async function openSavedPlan(plan) {
   currentPlanId = plan.id;
   const form = $('#planForm');
@@ -796,7 +821,9 @@ async function openSavedPlan(plan) {
   if ($('#planEditor')) $('#planEditor').value = text || $('#planEditor').value;
   $('#savedPlanDocument').append($('#planPreview'));
   if($('#printBody')) $('#printBody').textContent=text;
-  $('#planPreview .plan-paper')?.classList.toggle('saved-text-only',!!text && text.trim()!==plainPlanText(generatedPlanData).trim());
+  const legacyText=!!text && text.trim()!==plainPlanText(generatedPlanData).trim();
+  $('#planPreview .plan-paper')?.classList.toggle('legacy-formatted',legacyText);
+  if(legacyText) $('#printStructured').innerHTML=formatSavedPlanText(text);
   showPage('documento'); window.scrollTo({ top:0, behavior:'smooth' });
 }
 async function deletePlan(plan) {

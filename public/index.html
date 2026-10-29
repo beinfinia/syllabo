@@ -169,6 +169,7 @@ input:focus,select:focus,textarea:focus{background:#fff;border-color:#7391e7;box
 .worksheet-section li{white-space:pre-line;line-height:1.6;margin-bottom:18px}@media print{.checklist-table{break-inside:avoid-page}.worksheet-section li{break-inside:avoid-page}}
 .saved-reader-toolbar{display:flex;align-items:center;gap:15px;margin-bottom:18px;color:var(--muted);font-size:13px}.saved-plan-view .editor-block,.saved-plan-view #savePlan{display:none!important}.saved-plan-view .plan-paper{margin-top:0}@media(max-width:720px){.saved-reader-toolbar{gap:12px}.saved-reader-toolbar button{font-size:13px}.saved-plan-view .plan-paper{border:0;border-radius:20px}}@media print{.page#documento{display:block!important}.saved-reader-toolbar{display:none!important}}
 .saved-plan-view .saved-text-only .print-body{display:block;white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.6}.saved-plan-view .saved-text-only .print-structured{display:none}
+.legacy-formatted .plan-meta p{margin:0;font-size:inherit}.legacy-plan-section p{margin:10px 0;line-height:1.7}.legacy-formatted .plan-heading h2{overflow-wrap:anywhere}
 </style>
 <link rel="manifest" href="./manifest.webmanifest"><link rel="stylesheet" href="./mobile.css?v=20261029-modern-selector-v1"></head>
 <body>
@@ -214,7 +215,7 @@ input:focus,select:focus,textarea:focus{background:#fff;border-color:#7391e7;box
   <section id="offlinePanel" hidden aria-labelledby="offlineTitle"><div class="offline-inner"><button type="button" id="closeOffline" class="soft-btn">← Volver</button><h1 id="offlineTitle">Mis PDF sin internet</h1><p>Copias guardadas en este teléfono. Se pueden abrir sin iniciar sesión. Si compartís el dispositivo, quitá las copias al terminar. Borrar los datos del navegador elimina estas copias; conservá también la descarga.</p><p id="offlineStatus" role="status"></p><div id="offlineList"></div><button type="button" id="clearOffline" class="text-btn">Quitar todas las copias del teléfono</button></div></section>
   <script type="module" src="./offline.js"></script>
   <script src="./ui.js?v=20261029-modern-selector-v1"></script>
-  <script type="module" src="./app.js?v=20261029-distinct-avatars"></script>
+  <script type="module" src="./app.js?v=20261029-structured-saved-text"></script>
 <dialog id="subjectDialog" class="subject-dialog" aria-labelledby="subjectDialogTitle"><div class="subject-dialog-head"><div><span class="eyebrow">Tu próxima clase</span><h2 id="subjectDialogTitle">Elegí la asignatura</h2></div><button id="closeSubjectDialog" type="button" class="soft-btn" aria-label="Cerrar selector">✕</button></div><label for="subjectDialogSearch" class="sr-only">Buscar asignatura</label><input id="subjectDialogSearch" type="search" placeholder="Buscar asignatura…" autocomplete="off"><div id="subjectDialogOptions" class="subject-dialog-options" role="group" aria-label="Asignaturas disponibles"></div><p id="subjectDialogStatus" class="muted" role="status"></p></dialog></body></html>
 
 
