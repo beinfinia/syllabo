@@ -211,11 +211,45 @@ function setPlanSubject(value) { const select=$('#planSubjectInput'); if(![...se
 function sentenceCase(value='') {
   return String(value).replace(/(^\s*|[.!?]\s+|\n\s*|:\s+)([a-záéíóúüñ])/g,(_,prefix,letter)=>prefix+letter.toLocaleUpperCase('es'));
 }
-function syncSubjectTrigger(){const field=$('#planSubjectInput');$('#subjectTriggerText').textContent=field.value||'Elegí una asignatura';}
+
+function subjectVisual(subject) {
+  const name=window.SyllaboSubjects.normalizeName(subject);
+  const symbols={
+    values:'<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/>',
+    women:'<circle cx="12" cy="8" r="5"/><path d="M12 13v9m-4-4h8"/>',
+    enterprise:'<path d="M4 21h16M6 17v-5m6 5V8m6 9V4M4 8l7-4 5 1 4-3"/>',
+    sport:'<circle cx="16" cy="4" r="2"/><path d="m12 8 4 3 4 1M12 8l-4 5 4 3-2 6m2-6 5 5M12 8 8 7l-4 4"/>',
+    language:'<path d="M12 5c-3-2-6-2-10-1v15c4-1 7-1 10 1 3-2 6-2 10-1V4c-4-1-7-1-10 1Zm0 0v15M5 8h4m-4 4h4m6-4h4m-4 4h4"/>',
+    math:'<rect x="5" y="2" width="14" height="20" rx="3"/><path d="M8 6h8M8 10h2m4 0h2m-8 4h2m4 0h2m-8 4h2m4 0h2"/>',
+    science:'<path d="M9 2h6m-5 0v7L4 19c-.7 1.2.1 3 1.5 3h13c1.4 0 2.2-1.8 1.5-3L14 9V2M7 15h10"/><circle cx="10" cy="18" r=".5"/>',
+    social:'<circle cx="12" cy="12" r="10"/><ellipse cx="12" cy="12" rx="4" ry="10"/><path d="M2 12h20M4 6h16M4 18h16"/>',
+    art:'<path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1-3.7c-.8-.5-.5-1.8.5-1.8H17A4 4 0 0 0 21 11a9 9 0 0 0-9-8Z"/><circle cx="7" cy="9" r="1"/><circle cx="12" cy="7" r="1"/><circle cx="17" cy="10" r="1"/><circle cx="6" cy="14" r="1"/>',
+    foreign:'<path d="M21 11a8 8 0 0 1-8 8H7l-5 3 2-6a8 8 0 1 1 17-5Z"/><path d="m7 14 3-7 3 7m-5-2h4m3-4h4m-2-1v8"/>',
+    biology:'<path d="M20 3C7 2 1 10 6 16c6 5 14-1 14-13ZM3 22 17 8m-9 9v-6m4 2h5"/>',
+    physics:'<circle cx="12" cy="12" r="1"/><ellipse cx="12" cy="12" rx="11" ry="4"/><ellipse cx="12" cy="12" rx="11" ry="4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="11" ry="4" transform="rotate(120 12 12)"/>',
+    history:'<path d="M4 5h16M6 2h12v5c0 3-4 3-4 5s4 2 4 5v5H6v-5c0-3 4-3 4-5s-4-2-4-5V2m-2 20h16M8 18h8"/>'
+  };
+  let key='language',tone='#e7e9fb';
+  if(/valores/.test(name)){key='values';tone='#fbe1ea';}
+  else if(/mujer/.test(name)){key='women';tone='#f0e1fc';}
+  else if(/emprend|prosper|econom/.test(name)){key='enterprise';tone='#e0f3e7';}
+  else if(/fisica.*deport|educacion fisica/.test(name)){key='sport';tone='#ffe8d5';}
+  else if(/matemat|aritmet|geometr/.test(name)){key='math';tone='#e3eaff';}
+  else if(/extranjera|ingles|frances/.test(name)){key='foreign';tone='#e1f2fa';}
+  else if(/arte|cultura/.test(name)){key='art';tone='#fae3f3';}
+  else if(/biolog/.test(name)){key='biology';tone='#e1f3e1';}
+  else if(/^fisica/.test(name)){key='physics';tone='#e6e4ff';}
+  else if(/historia/.test(name)&&!/geograf/.test(name)){key='history';tone='#f9edd8';}
+  else if(/social|geograf|mundo/.test(name)){key='social';tone='#dfefe7';}
+  else if(/cienc|quimic/.test(name)){key='science';tone='#def3ef';}
+  return {tone,icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${symbols[key]}</svg>`};
+}
+
+function syncSubjectTrigger(){const field=$('#planSubjectInput');$('#subjectTriggerText').textContent=field.value||'Elegí una asignatura';const visual=subjectVisual(field.value);$('.subject-trigger-icon').innerHTML=visual.icon;$('.subject-trigger-icon').style.background=visual.tone;}
 function renderSubjectOptions(){
   const term=window.SyllaboSubjects.normalizeName($('#subjectDialogSearch').value);
   const options=[...$('#planSubjectInput').options].filter(o=>o.value&&(!term||window.SyllaboSubjects.normalizeName(o.textContent).includes(term)));
-  $('#subjectDialogOptions').innerHTML=options.map((option,index)=>`<button type="button" class="subject-option" style="--subject-tone:${['#e8e8ff','#e1f3ed','#fff0db','#f9e4f0'][index%4]}" data-subject-choice="${escapeHtml(option.value)}" aria-pressed="${option.value===$('#planSubjectInput').value}"><span class="subject-option-mark" aria-hidden="true">▤</span><span>${escapeHtml(option.textContent)}</span><span class="subject-option-check" aria-hidden="true">${option.value===$('#planSubjectInput').value?'✓':'›'}</span></button>`).join('');
+  $('#subjectDialogOptions').innerHTML=options.map((option,index)=>`<button type="button" class="subject-option" style="--subject-tone:${subjectVisual(option.value).tone}" data-subject-choice="${escapeHtml(option.value)}" aria-pressed="${option.value===$('#planSubjectInput').value}"><span class="subject-option-mark" aria-hidden="true">${subjectVisual(option.value).icon}</span><span>${escapeHtml(option.textContent)}</span><span class="subject-option-check" aria-hidden="true">${option.value===$('#planSubjectInput').value?'✓':'›'}</span></button>`).join('');
   $('#subjectDialogStatus').textContent=options.length?`${options.length} asignaturas disponibles`:'No hay coincidencias. Revisá tus asignaturas en Perfil.';
   $('#subjectDialogOptions').querySelectorAll('[data-subject-choice]').forEach(button=>button.addEventListener('click',()=>{setPlanSubject(button.dataset.subjectChoice);$('#planSubjectInput').dispatchEvent(new Event('change',{bubbles:true}));$('#subjectDialog').close();$('#chooseSubject').focus();}));
 }
@@ -752,7 +786,7 @@ function renderPlanList() {
     const palette=['#c8bbf4','#f4b8dc','#e8ef72','#ff936b','#afd0ed','#9dcbb7'];
     const visible=folders.filter(folder=>folder.plans.some(matches));
     $('#planResults').textContent=`${visible.length} ${visible.length===1?'asignatura':'asignaturas'} · Elegí una carpeta para ver su línea de tiempo.`;
-    $('#plansList').innerHTML=visible.length?visible.map((folder,index)=>`<button class="subject-folder" style="--folder-color:${palette[index%palette.length]}" data-folder="${escapeHtml(folder.key)}"><h2>${escapeHtml(folder.name)}</h2><span class="folder-symbol" aria-hidden="true">${['▤','✎','✳','◈','≋','✦'][index%6]}</span><span class="folder-count">${folder.plans.length} ${folder.plans.length===1?'plan':'planes'}</span><small>Último plan: ${escapeHtml(prettyDate(folder.plans[0].lesson_date))}</small></button>`).join(''):'<div class="empty">No hay planes para mostrar. Creá un plan o ajustá los filtros.</div>';
+    $('#plansList').innerHTML=visible.length?visible.map((folder,index)=>`<button class="subject-folder" style="--folder-color:${palette[index%palette.length]}" data-folder="${escapeHtml(folder.key)}"><h2>${escapeHtml(folder.name)}</h2><span class="folder-symbol" aria-hidden="true">${subjectVisual(folder.name).icon}</span><span class="folder-count">${folder.plans.length} ${folder.plans.length===1?'plan':'planes'}</span><small>Último plan: ${escapeHtml(prettyDate(folder.plans[0].lesson_date))}</small></button>`).join(''):'<div class="empty">No hay planes para mostrar. Creá un plan o ajustá los filtros.</div>';
     $('#plansList').querySelectorAll('[data-folder]').forEach(button=>button.addEventListener('click',()=>{activePlanFolder=button.dataset.folder;renderPlanList();}));return;
   }
   $('#activeFolderName').textContent=current.name;

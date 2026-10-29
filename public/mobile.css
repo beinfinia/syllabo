@@ -165,3 +165,25 @@ body{background:linear-gradient(160deg,#f3f1fc 0%,#f6f8fc 45%,#eef7f5 100%);back
 #app .checklist-table{border-radius:14px;overflow:hidden}#app .checklist-table th{background:#edf1fc;color:#435886}
 @media(max-width:720px){.subject-dialog{padding:20px 16px;border-radius:25px;max-height:82dvh}.subject-dialog-head h2{font-size:23px}.subject-option{font-size:var(--reading-size);padding:12px;gap:10px}.subject-option-mark{width:36px;height:36px;min-width:36px}#app .plan-paper{padding:18px 13px}#app .plan-heading{padding:20px 14px;border-radius:17px}#app .plan-heading .brand{font-size:16px!important}#app .plan-meta{padding:15px}#app .activity{padding:15px}#app .plan-block>h3{font-size:var(--reading-size);line-height:1.5}}
 @media print{#subjectDialog{display:none!important}#app .plan-heading,#app .plan-meta,#app .activity,#app .plan-block>h3{background:#fff!important;box-shadow:none!important}#app .plan-paper{border:0;box-shadow:none;padding:0}#app .plan-heading{padding:0;border-radius:0}}
+
+/* Subject symbols stay consistent across search, selection and folders. */
+.subject-option-mark svg,.subject-trigger-icon svg{width:23px;height:23px;display:block}
+.subject-trigger-icon{display:grid;place-items:center}
+.folder-symbol svg{width:42px;height:42px;display:block}
+.subject-option-mark{background:linear-gradient(145deg,var(--subject-tone),#ffffff);color:#46547b;box-shadow:inset 0 0 0 1px #ffffffb3}
+.subject-option{background:linear-gradient(120deg,#ffffff,#fafbff);box-shadow:0 3px 10px #34446904}
+.subject-option[aria-pressed="true"]{background:linear-gradient(120deg,#efebff,#e8f2ff);border-color:#7e80cd}
+#app .soft-btn{background:linear-gradient(120deg,#f1edff,#edf3ff);border-color:#d9ddf1;color:#3c5184}
+#app .blue{background:linear-gradient(120deg,#3971cb,#6958c3);color:#fff;border:0;box-shadow:0 4px 12px #4e5ac61a}
+#app .dictate-button{background:linear-gradient(120deg,#f0ebff,#e7f4fa);border-color:#cfd8ed}
+#app .dictate-button.listening{background:linear-gradient(120deg,#ffe6eb,#fff0de);border-color:#dca2ac;color:#8a293c}
+#app .danger-btn{background:linear-gradient(120deg,#fff4f6,#fff1ee);border-color:#f0d3d8;color:#a93f53}
+#app .stat{background:linear-gradient(140deg,#fff,#f1f3ff);border:1px solid #e4e8f5}
+#app .stat:nth-child(2){background:linear-gradient(140deg,#fff,#eef7ef)}
+#app .stat:nth-child(3){background:linear-gradient(140deg,#fff,#f9eef6)}
+#app .reading-settings,#app .avatar-picker{background:linear-gradient(135deg,#faf8ff,#f2f7ff)}
+#app .avatar-option:has(input:checked){background:linear-gradient(145deg,#f1eaff,#e7f1ff)}
+#app .timeline-date-number{background:linear-gradient(145deg,#ebe5ff,#dfeaff)}
+#app .nav .tab{background:linear-gradient(145deg,var(--section-bg),#fff)!important}
+#app .nav .tab.active{background:linear-gradient(145deg,var(--section-bg),var(--section-bg))!important;box-shadow:0 3px 9px #38477413}
+@media print{#app button,#subjectDialog{display:none!important}.stat,.reading-settings,.avatar-picker{background:#fff!important}}
