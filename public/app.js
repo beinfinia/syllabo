@@ -322,7 +322,7 @@ $('#cancelForgot').addEventListener('click', () => {
 });
 $('#forgotForm').addEventListener('submit', async event => {
   event.preventDefault(); const email = event.currentTarget.elements.email.value.trim();
-  const button = event.currentTarget.querySelector('button[type="submit"]'); button.disabled = true; setStatus('#authStatus', 'Enviando enlace de recuperación…');
+  const button = event.currentTarget.querySelector('button[type="submit"], button:not([type])'); button.disabled = true; setStatus('#authStatus', 'Enviando enlace de recuperación…');
   try {
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: authRedirectTo() });
     if (error) throw error;
@@ -334,7 +334,7 @@ $('#forgotForm').addEventListener('submit', async event => {
 $('#recoveryForm').addEventListener('submit', async event => {
   event.preventDefault(); const password = new FormData(event.currentTarget).get('password');
   if (String(password).length < 8) { setStatus('#authStatus','La contraseña debe tener al menos 8 caracteres.','error'); return; }
-  const button = event.currentTarget.querySelector('button[type="submit"]'); button.disabled = true; setStatus('#authStatus','Actualizando contraseña…');
+  const button = event.currentTarget.querySelector('button[type="submit"], button:not([type])'); button.disabled = true; setStatus('#authStatus','Actualizando contraseña…');
   try {
     const { error } = await supabase.auth.updateUser({ password });
     if (error) throw error;
@@ -542,7 +542,7 @@ if (!$('#establishSchedule').dataset.uiFallback) $('#establishSchedule').addEven
 $('#scheduleForm').addEventListener('submit', async event => {
   event.preventDefault(); const form=event.currentTarget; const values=Object.fromEntries(new FormData(form).entries());
   values.weekday=Number(values.weekday); values.duration_minutes=Number(values.duration_minutes); values.start_time=values.start_time || null;
-  const button=form.querySelector('button[type="submit"]') || form.querySelector('button'); button.disabled=true;
+  const button=form.querySelector('button[type="submit"], button:not([type])') || form.querySelector('button'); button.disabled=true;
   setStatus('#scheduleStatus','Guardando clase…');
   try {
     const {error}=await supabase.from('class_schedules').insert(values);
@@ -585,7 +585,7 @@ $('#calendarEventForm').addEventListener('submit',async event=>{
   event.preventDefault();const data=Object.fromEntries(new FormData(event.currentTarget).entries());const id=data.id;delete data.id;
   data.start_time=data.start_time||null;data.end_date=data.end_date||null;data.updated_at=new Date().toISOString();
   if(data.end_date&&data.end_date<data.start_date){setStatus('#eventStatus','La fecha de fin debe ser igual o posterior a la fecha de inicio.','error');return;}
-  const form=event.currentTarget;const button=form.querySelector('button[type="submit"]');button.disabled=true;setStatus('#eventStatus','Guardando fecha…');
+  const form=event.currentTarget;const button=form.querySelector('button[type="submit"], button:not([type])');button.disabled=true;setStatus('#eventStatus','Guardando fecha…');
   try {
     const query=supabase.from('calendar_events');const result=id?await query.update(data).eq('id',id).select().single():await query.insert(data).select().single();
     if(result.error)throw result.error;
