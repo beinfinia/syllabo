@@ -60,11 +60,12 @@ function prettyDate(value) {
   return new Date(`${value}T12:00:00`).toLocaleDateString('es-NI', { day:'numeric', month:'long', year:'numeric' });
 }
 function showPage(page) {
+  if (page === 'horario') page = 'calendario';
   document.querySelectorAll('.page').forEach(el => el.classList.toggle('hidden', el.id !== page));
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.page === page));
   if (page === 'planes') loadPlans();
   if (page === 'horario') loadSchedule();
-  if (page === 'calendario') loadCalendar();
+  if (page === 'calendario') { loadCalendar(); loadSchedule(); }
   if (page === 'perfil') loadProfile();
   if (page === 'inicio') loadHome();
 }
@@ -647,16 +648,36 @@ function populatePlanMonths(plans) {
   if (months.includes(selected)) select.value = selected;
 }
 function populatePlanSubjects(plans) { const select=$('#planSubjectFilter'); const selected=select.value; const values=[...new Set(plans.map(p=>p.subject).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));select.innerHTML='<option value="">Todas las asignaturas</option>'+values.map(value=>`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');if(values.includes(selected))select.value=selected; }
-function renderPlanList() {
-  const search = $('#planSearch').value.trim().toLocaleLowerCase(); const month = $('#planMonth').value; const subject=$('#planSubjectFilter').value; const sort=$('#planSort').value;
-  const plans = allPlans.filter(p => (!month || p.lesson_date.startsWith(month)) && (!subject || p.subject===subject) && (!search || `${p.subject} ${p.grade} ${p.topic}`.toLocaleLowerCase().includes(search)));
-  plans.sort((a,b)=>sort==='subject'?a.subject.localeCompare(b.subject,'es')||a.topic.localeCompare(b.topic,'es'):sort==='topic'?a.topic.localeCompare(b.topic,'es'):sort==='date-asc'?a.lesson_date.localeCompare(b.lesson_date):b.lesson_date.localeCompare(a.lesson_date));
-  if (!plans.length) { $('#plansList').innerHTML = '<div class="empty">No encontramos planes con esos filtros. Creá tu primer plan para empezar.</div>'; return; }
-  $('#plansList').innerHTML = plans.map(plan => `<article class="item"><div class="section-title"><div><div class="row"><span class="pill">${escapeHtml(prettyDate(plan.lesson_date))}</span><span class="pill green">${escapeHtml(plan.duration_minutes)} min</span></div><p class="item-title" style="margin-top:9px">${escapeHtml(plan.subject)} · ${escapeHtml(plan.grade)}</p><p>${escapeHtml(plan.topic)}</p></div><div class="row noprint"><button class="soft-btn" data-open-plan="${plan.id}">Abrir / editar</button><button class="danger-btn" data-delete-plan="${plan.id}">Eliminar</button></div></div></article>`).join('');
-  plans.forEach(plan => $(`[data-open-plan="${plan.id}"]`).addEventListener('click', () => openSavedPlan(plan)));
-  plans.forEach(plan => $(`[data-delete-plan="${plan.id}"]`).addEventListener('click', () => deletePlan(plan)));
+function subjectKey(value) { return window.SyllaboSubjects.normalizeName(value || 'Sin asignatura'); }
+function sortPlansNewest(plans) { return [...plans].sort((a,b) => String(b.lesson_date||'').localeCompare(String(a.lesson_date||'')) || String(b.created_at||'').localeCompare(String(a.created_at||''))); }
+function planFolders(plans) {
+  const groups = new Map();
+  for (const plan of plans) { const key=subjectKey(plan.subject); if (!groups.has(key)) groups.set(key,{key,name:plan.subject||'Sin asignatura',plans:[]}); groups.get(key).plans.push(plan); }
+  return [...groups.values()].map(folder=>({...folder,plans:sortPlansNewest(folder.plans)})).sort((a,b)=>a.name.localeCompare(b.name,'es'));
 }
-$('#planSearch').addEventListener('input', renderPlanList); $('#planMonth').addEventListener('change', renderPlanList); $('#planSubjectFilter').addEventListener('change',renderPlanList); $('#planSort').addEventListener('change',renderPlanList);
+let activePlanFolder = '';
+function renderPlanList() {
+  const search=$('#planSearch').value.trim().toLocaleLowerCase(); const month=$('#planMonth').value;
+  const matches=plan=> (!month||String(plan.lesson_date||'').startsWith(month)) && (!search||`${plan.subject} ${plan.grade} ${plan.content||plan.topic}`.toLocaleLowerCase().includes(search));
+  const folders=planFolders(allPlans); const current=folders.find(folder=>folder.key===activePlanFolder);
+  if(activePlanFolder&&!current)activePlanFolder='';
+  $('#planFolderHeading').classList.toggle('hidden',!current);
+  $('#plansList').classList.toggle('subject-folders',!current);
+  if(!current) {
+    const palette=['#c8bbf4','#f4b8dc','#e8ef72','#ff936b','#afd0ed','#9dcbb7'];
+    const visible=folders.filter(folder=>folder.plans.some(matches));
+    $('#plansList').innerHTML=visible.length?visible.map((folder,index)=>`<button class="subject-folder" style="--folder-color:${palette[index%palette.length]}" data-folder="${escapeHtml(folder.key)}"><h2>${escapeHtml(folder.name)}</h2><span class="folder-symbol" aria-hidden="true">${['▤','✎','✳','◈','≋','✦'][index%6]}</span><span class="folder-count">${folder.plans.length} ${folder.plans.length===1?'plan':'planes'}</span><small>Último plan: ${escapeHtml(prettyDate(folder.plans[0].lesson_date))}</small></button>`).join(''):'<div class="empty">No hay planes para mostrar. Creá un plan o ajustá los filtros.</div>';
+    $('#plansList').querySelectorAll('[data-folder]').forEach(button=>button.addEventListener('click',()=>{activePlanFolder=button.dataset.folder;renderPlanList();}));return;
+  }
+  $('#activeFolderName').textContent=current.name;
+  const plans=current.plans.filter(matches);
+  $('#activeFolderCount').textContent=`${plans.length} de ${current.plans.length} planes · Más recientes primero`;
+  $('#plansList').innerHTML=plans.length?plans.map(plan=>`<article class="plan-list-row"><div><h3>${escapeHtml(plan.content||plan.topic||'Plan de clase')}</h3><p class="muted">${escapeHtml(prettyDate(plan.lesson_date))} · ${escapeHtml(plan.grade)} · ${escapeHtml(plan.duration_minutes)} min</p></div><div class="row"><button class="soft-btn" data-open-plan="${plan.id}">Abrir / editar</button><button class="danger-btn" data-delete-plan="${plan.id}" aria-label="Eliminar plan ${escapeHtml(plan.topic)}">Eliminar</button></div></article>`).join(''):'<div class="empty">No hay planes con esos filtros en esta carpeta.</div>';
+  plans.forEach(plan=>$(`[data-open-plan="${plan.id}"]`).addEventListener('click',()=>openSavedPlan(plan)));
+  plans.forEach(plan=>$(`[data-delete-plan="${plan.id}"]`).addEventListener('click',()=>deletePlan(plan)));
+}
+$('#backToFolders').addEventListener('click',()=>{activePlanFolder='';renderPlanList();});
+$('#planSearch').addEventListener('input',renderPlanList); $('#planMonth').addEventListener('change',renderPlanList);
 async function openSavedPlan(plan) {
   currentPlanId = plan.id;
   const form = $('#planForm');
@@ -769,11 +790,11 @@ function getCalendarItems(date) {
   const classes=holiday?[]:allCalendarSchedule.filter(item=>item.weekday===weekday).map(item=>({kind:'class',title:`${item.subject} · ${item.grade}`,time:(item.start_time||'').slice(0,5),item}));
   const plans=allCalendarPlans.filter(item=>item.lesson_date===key).map(item=>({kind:'plan',title:`Plan: ${item.subject} · ${item.topic}`,time:'',item}));
   const events=allCalendarEvents.filter(item=>item.start_date<=key&&(item.end_date||item.start_date)>=key).map(item=>({kind:item.event_type==='feriado'?'holiday':'event',title:item.title,time:(item.start_time||'').slice(0,5),item}));
-  return [...classes,...events,...plans].sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
+  return [...classes,...events,...plans].sort((a,b)=>Number(b.kind==='holiday')-Number(a.kind==='holiday')||(a.time||'00:00').localeCompare(b.time||'00:00'));
 }
 function calendarEntry(item, date) {
   const className=item.kind==='holiday'?'holiday':item.kind==='plan'?'plan':'';
-  const label=`${item.time?`${item.time} `:''}${item.title}`;
+  const label=`${item.kind==='holiday'?'Feriado: ':''}${item.time?`${item.time} `:''}${item.title}`;
   const action=item.kind==='event'||item.kind==='holiday'?`data-calendar-event="${item.item.id}"`:item.kind==='plan'?`data-calendar-plan="${item.item.id}"`:`data-calendar-class="${escapeHtml(dateKey(date))}" data-subject="${escapeHtml(item.item.subject)}" data-grade="${escapeHtml(item.item.grade)}" data-duration="${item.item.duration_minutes}"`;
   return `<button class="calendar-entry ${className}" ${action} title="${escapeHtml(label)}">${escapeHtml(label)}</button>`;
 }
@@ -786,13 +807,15 @@ function renderCalendar() {
 }
 function renderCalendarMonth() {
   const first=new Date(calendarDate.getFullYear(),calendarDate.getMonth(),1,12);const offset=(first.getDay()+6)%7;const start=new Date(first);start.setDate(first.getDate()-offset);const days=Array.from({length:42},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d;});
-  $('#calendarBoard').innerHTML=`<div class="calendar-board-scroll"><div class="calendar-weekdays">${calendarWeekdays.map(day=>`<span>${day}</span>`).join('')}</div><div class="calendar-grid">${days.map(date=>{const items=getCalendarItems(date);return `<div class="calendar-cell ${date.getMonth()!==calendarDate.getMonth()?'outside':''} ${dateKey(date)===localISODate()?'today':''}"><div class="calendar-cell-head"><span>${date.getDate()}</span><button class="text-btn" data-add-date="${dateKey(date)}" aria-label="Agregar evento">+</button></div>${items.slice(0,3).map(item=>calendarEntry(item,date)).join('')}${items.length>3?`<span class="muted">+${items.length-3} más</span>`:''}</div>`;}).join('')}</div></div>`;
+  $('#calendarBoard').innerHTML=`<div class="calendar-board-scroll"><div class="calendar-weekdays">${calendarWeekdays.map(day=>`<span>${day}</span>`).join('')}</div><div class="calendar-grid">${days.map(date=>{const items=getCalendarItems(date);return `<div class="calendar-cell ${date.getMonth()!==calendarDate.getMonth()?'outside':''} ${dateKey(date)===localISODate()?'today':''} ${items.some(item=>item.kind==='holiday')?'has-holiday':''}"><div class="calendar-cell-head"><span>${date.getDate()}</span><button class="text-btn" data-add-date="${dateKey(date)}" aria-label="Agregar evento">+</button></div>${items.slice(0,3).map(item=>calendarEntry(item,date)).join('')}${items.length>3?`<button class="calendar-more" data-show-day="${dateKey(date)}">+${items.length-3} más</button>`:''}</div>`;}).join('')}</div></div>`;
 }
+function blockEnd(time, duration) { if (!time) return '';const [h,m]=time.split(':').map(Number);const total=h*60+m+Number(duration||45);return `${String(Math.floor(total/60)%24).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`; }
 function renderCalendarAgenda(start,count) {
   const days=Array.from({length:count},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d;});
-  $('#calendarBoard').innerHTML=days.map(date=>{const items=getCalendarItems(date);return `<section class="agenda-day"><div class="section-title"><h3>${date.toLocaleDateString('es-NI',{weekday:'long',day:'numeric',month:'long'})}</h3><button class="text-btn" data-add-date="${dateKey(date)}">+ Agregar fecha</button></div>${items.length?items.map(item=>`<div class="row" style="padding:8px 0;border-top:1px solid var(--line)"><span class="agenda-hour">${escapeHtml(item.time|| (item.kind==='plan'?'Plan':'Todo el día'))}</span><span>${escapeHtml(item.title)}</span>${item.kind==='event'||item.kind==='holiday'?`<button class="soft-btn" data-edit-event="${item.item.id}">Editar</button><button class="danger-btn" data-delete-event="${item.item.id}">Eliminar</button>`:item.kind==='class'?`<button class="soft-btn" data-calendar-class="${dateKey(date)}" data-subject="${escapeHtml(item.item.subject)}" data-grade="${escapeHtml(item.item.grade)}" data-duration="${item.item.duration_minutes}">Planear</button>`:''}</div>`).join(''):'<p class="muted">Sin clases ni fechas registradas.</p>'}</section>`;}).join('');
+  $('#calendarBoard').innerHTML=days.map(date=>{const items=getCalendarItems(date);return `<section class="agenda-day"><div class="section-title"><h3>${date.toLocaleDateString('es-NI',{weekday:'long',day:'numeric',month:'long'})}</h3><button class="text-btn" data-add-date="${dateKey(date)}">+ Agregar fecha</button></div>${items.length?items.map(item=>`<div class="agenda-row ${item.kind==='holiday'?'holiday':''}"><span class="agenda-hour">${escapeHtml(item.time||(item.kind==='plan'?'Plan':'Todo el día'))}${item.kind==='class'&&item.time?`<br><small>a ${blockEnd(item.time,item.item.duration_minutes)}</small>`:''}</span><div><strong>${escapeHtml(item.kind==='holiday'?'Feriado: '+item.title:item.title)}</strong>${item.kind==='class'?`<p class="muted">${escapeHtml(item.item.duration_minutes)} min${item.item.section?` · Sección ${escapeHtml(item.item.section)}`:''}</p>`:''}</div><div class="row">${item.kind==='event'||item.kind==='holiday'?`<button class="soft-btn" data-edit-event="${item.item.id}">Editar</button><button class="danger-btn" data-delete-event="${item.item.id}">Eliminar</button>`:item.kind==='class'?`<button class="soft-btn" data-calendar-class="${dateKey(date)}" data-subject="${escapeHtml(item.item.subject)}" data-grade="${escapeHtml(item.item.grade)}" data-duration="${item.item.duration_minutes}">Planear</button>`:`<button class="soft-btn" data-calendar-plan="${item.item.id}">Abrir plan</button>`}</div></div>`).join(''):'<p class="muted">Sin clases ni fechas registradas.</p>'}</section>`;}).join('');
 }
 function bindCalendarEntries() {
+  $('#calendarBoard').querySelectorAll('[data-show-day]').forEach(button=>button.addEventListener('click',()=>{calendarDate=localDateFromKey(button.dataset.showDay);$('#calendarView').value='day';renderCalendar();}));
   $('#calendarBoard').querySelectorAll('[data-add-date]').forEach(button=>button.addEventListener('click',()=>openCalendarEventForm({start_date:button.dataset.addDate})));
   $('#calendarBoard').querySelectorAll('[data-calendar-event]').forEach(button=>button.addEventListener('click',()=>{const event=allCalendarEvents.find(item=>item.id===button.dataset.calendarEvent);if(event)openCalendarEventForm(event);}));
   $('#calendarBoard').querySelectorAll('[data-edit-event]').forEach(button=>button.addEventListener('click',()=>{const event=allCalendarEvents.find(item=>item.id===button.dataset.editEvent);if(event)openCalendarEventForm(event);}));
@@ -875,3 +898,4 @@ if (!supabase) {
     if (session?.user && !recoveringPassword && $('#app').classList.contains('hidden')) await openApp(session.user);
   } catch (error) { setStatus('#authStatus', `No se pudo restaurar tu sesión: ${friendlyError(error)}`, 'error'); }
 }
+
