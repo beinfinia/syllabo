@@ -50,6 +50,21 @@
       : '<span class="muted">Elegí modalidad y grado para ver las materias sugeridas. Podés agregar una asignatura propia abajo.</span>';
   };
   window.SyllaboSubjects = { catalog: subjectCatalog, getFor: getSubjectsFor, populateChoices: populateSubjectChoices };
+  const resourceCatalog = [
+    'Pizarra y marcadores/tiza','Libros de texto','Cuadernos y lápices','Hojas y cartulinas','Láminas e imágenes','Tarjetas y fichas','Material concreto o manipulativo','Materiales reciclados y del entorno','Proyector o televisor','Computadora o tableta','Acceso a internet','Biblioteca o rincón de lectura','Patio o espacio abierto'
+  ];
+  const normalizeResources = (values) => {
+    const list = Array.isArray(values) ? values : String(values || '').split(/[,;\n]+/);
+    return [...new Set(list.map(value => String(value).trim()).filter(Boolean))];
+  };
+  const selectedResources = (form) => [...form.querySelectorAll('input[name="resource_choice"]:checked')].map(input => input.value);
+  const populateResourceChoices = (form, selected = selectedResources(form)) => {
+    const container = form.querySelector('[data-resource-choices]');
+    if (!container) return;
+    const options = [...new Set([...resourceCatalog, ...normalizeResources(selected)])];
+    container.innerHTML = options.map(resource => `<label class="choice"><input type="checkbox" name="resource_choice" value="${escapeHtml(resource)}" ${selected.includes(resource) ? 'checked' : ''}>${escapeHtml(resource)}</label>`).join('');
+  };
+  window.SyllaboResources = { catalog: resourceCatalog, normalize: normalizeResources, getSelected: selectedResources, populateChoices: populateResourceChoices };
   const dateToday = () => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -70,6 +85,7 @@
     const form = $(`#${id}`);
     if (!form) return;
     populateSubjectChoices(form);
+    populateResourceChoices(form);
     form.elements.modality?.addEventListener('change', () => {
       const selected = selectedSubjects(form);
       updateGradeOptions(form);

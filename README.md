@@ -10,11 +10,11 @@ Asistente de planificación docente con ficha de bienvenida, perfil, agenda sema
 - Materias sugeridas según modalidad y grado; el docente puede agregar asignaturas de su centro.
 - Encuesta breve del entorno docente, incluida la edad más frecuente del grupo; las respuestas quedan en el perfil y ayudan a adecuar actividades y ejemplos.
 - La materia se elige desde las materias guardadas por el docente y el grado se completa desde el perfil.
-- Antes de generar, se muestra un resumen de asignatura, grado del perfil, tema, fecha, contenido, indicador, duración y recursos para revisar o corregir.
+- Antes de generar, se muestra un resumen de asignatura, grado del perfil, fecha, contenido, indicador, duración y recursos del perfil para revisar.
 - El formulario no pide grado ni criterios de evaluación: el grado se toma del perfil o del bloque horario seleccionado y los criterios se proponen automáticamente a partir del contenido y el indicador.
-- Iconos Lucide 0.468.0 locales para dictado por voz, mostrar/ocultar contraseña y acciones; están en `public/icons/` y no dependen de un CDN.
-- Dictado por voz en tema, contenido, indicador y recursos; usa el reconocimiento del navegador en Chrome o Edge, requiere permiso de micrófono y conexión a internet.
-- Biblioteca de planes con búsqueda, filtros por asignatura y mes y orden por fecha, materia o tema.
+- Iconos SVG locales para navegación, calendario, horario, dictado por voz y mostrar/ocultar contraseña; están en `public/icons/` y no dependen de un CDN.
+- Dictado por voz en contenido e indicador; usa el reconocimiento del navegador en Chrome o Edge, requiere permiso de micrófono y conexión a internet.
+- Biblioteca de planes con búsqueda, filtros por asignatura y mes y orden por fecha, materia o contenido.
 - Horario semanal como agenda por día y hora, con un botón para establecerlo y alertas de clases que necesitan planificación.
 - Calendario con vistas de mes, semana y día; reúne clases, planes y actividades, festivales y feriados creados por el docente. Los feriados registrados omiten las clases recurrentes y las alertas de planificación de esas fechas.
 - Horario de lunes a viernes, con varias clases por día.
@@ -23,6 +23,12 @@ Asistente de planificación docente con ficha de bienvenida, perfil, agenda sema
 - Tres momentos de clase con distribución exacta de minutos, ejemplos, dinámicas, evaluación y apoyos.
 - Edición, guardado, búsqueda, apertura, eliminación e impresión del plan a PDF.
 - Datos aislados por cuenta con Row Level Security (RLS).
+
+## Interfaz móvil
+
+La vista se adapta a teléfonos: navegación inferior con iconos, controles táctiles amplios, formularios en una columna y calendario desplazable. Usa la paleta y tipografía de Syllabo, con avatares ilustrados según el perfil.
+
+Los recursos de aula se seleccionan al completar el perfil y se guardan en `teacher_context.available_resources` de Supabase. Se pueden activar o desactivar desde Mi perfil; el formulario del plan toma esa lista automáticamente.
 
 ## Base de datos
 

@@ -38,6 +38,7 @@ let allPlans = [];
 
 let currentProfile = null;
 let planningGradeOverride = '';
+let planResourcesOverride = null;
 let openingUserId = null;
 let initializedUserId = null;
 let calendarDate = new Date();
@@ -166,8 +167,12 @@ function readProfileForm(form) {
   delete data.custom_subject;
   delete data.subject_choice;
   data.subjects=[...new Set(selectedSubjects)];
+  const selectedResources=window.SyllaboResources?.getSelected(form) || [];
+  const customResources=window.SyllaboResources?.normalize(form.elements.other_resources?.value || '') || [];
   data.full_name = [data.first_name.trim(),data.last_name.trim()].filter(Boolean).join(' ');
-  data.teacher_context = Object.fromEntries(['student_age_range','context_zone','class_size','internet_access','available_resources','planning_challenges','preferred_dynamics'].map(key=>[key,data[key] || '']));
+  data.teacher_context = Object.fromEntries(['student_age_range','context_zone','class_size','internet_access','planning_challenges','preferred_dynamics'].map(key=>[key,data[key] || '']));
+  data.teacher_context.available_resources=[...new Set([...selectedResources,...customResources])];
+  delete data.other_resources; delete data.resource_choice;
   for (const key of Object.keys(data.teacher_context)) delete data[key];
   return data;
 }
@@ -176,7 +181,11 @@ function fillTeacherForm(form, profile) {
   populateGradeChoices(form,profile.modality || '',profile.primary_grade || '');
   populateSubjectChoices(form,profile.subjects || []);
   const context = profile.teacher_context || {};
-  for (const key of ['student_age_range','context_zone','class_size','internet_access','available_resources','planning_challenges','preferred_dynamics']) if (form.elements[key]) form.elements[key].value = context[key] || '';
+  for (const key of ['student_age_range','context_zone','class_size','internet_access','planning_challenges','preferred_dynamics']) if (form.elements[key]) form.elements[key].value = context[key] || '';
+  const resources=window.SyllaboResources?.normalize(context.available_resources) || [];
+  window.SyllaboResources?.populateChoices(form, resources.filter(value => window.SyllaboResources.catalog.includes(value)));
+  const customResources=resources.filter(value => !window.SyllaboResources?.catalog.includes(value));
+  if(form.elements.other_resources) form.elements.other_resources.value=customResources.join(', ');
 }
 function populatePlanSubjectOptions(profile, selected = '') {
   const select=$('#planSubjectInput'); const subjects=profile?.subjects||[]; const value=selected||select.value;
@@ -190,7 +199,7 @@ function updatePlanAgeHint(profile) {
   const range = profile?.teacher_context?.student_age_range || '';
   $('#planContextHint').textContent = `El plan usará ${grade}${range ? ` y adaptará ejemplos y dinámicas para estudiantes de ${range}` : ''}. Podés actualizar estos datos en Mi perfil.`;
 }
-function setTeacherIdentity(profile) { $('#teacherAvatar').textContent = profile.gender === 'varon' ? '👨‍🏫' : '👩‍🏫'; }
+function setTeacherIdentity(profile) { const avatar=$('#teacherAvatar'); const feminine=profile.gender==='mujer'; avatar.innerHTML=`<img class="avatar-image" src="./icons/avatar-${feminine?'woman':'man'}.svg" alt="">`; const name=[profile.first_name,profile.last_name].filter(Boolean).join(' '); avatar.setAttribute('aria-label',`Avatar de ${name||'docente'}`); avatar.title=name||'Docente'; }
 async function saveTeacherProfile(form, onboarding = false) {
   const data = readProfileForm(form);
   if (!data.subjects.length) throw new Error('Seleccioná al menos una materia.');
@@ -321,7 +330,6 @@ function plainPlanText(plan) {
     `Docente: ${plan.teacher || ''}`,
     `Centro educativo: ${plan.school || ''}`,
     `Asignatura: ${plan.subject} · Grado: ${plan.grade} · Edad de referencia: ${plan.student_age_range || 'no especificada'} · Fecha: ${prettyDate(plan.lesson_date)} · Duración: ${plan.duration_minutes} minutos`,
-    `Tema: ${plan.topic}`,
     `Contenido: ${plan.content}`,
     `Indicador de logro: ${plan.achievement_indicator}`,
     `Criterios de evaluación: ${plan.evaluation_criteria || 'Observar la participación, el procedimiento y el aprendizaje demostrado.'}`,
@@ -338,8 +346,16 @@ function suggestEvaluationCriteria(data) {
   return [
     `Demuestra el aprendizaje esperado descrito en el indicador: ${data.achievement_indicator}`,
     `Relaciona el contenido «${data.content}» con la actividad o el ejemplo trabajado.`,
-    `Explica o presenta su respuesta con claridad y utiliza ideas vinculadas con «${data.topic}».`
+    `Explica o presenta su respuesta con claridad y utiliza ideas vinculadas con «${data.content}».`
   ].join('\n');
+}
+function formatResourceList(values) {
+  const normalized=window.SyllaboResources?.normalize(values) || (Array.isArray(values)?values:String(values||'').split(/[,;\n]+/).map(value=>value.trim()).filter(Boolean));
+  return normalized.join(', ');
+}
+function derivePlanTitle(content='') {
+  const first=String(content).trim().split(/\n|[.!?](?:\s|$)/)[0].trim();
+  return first.length>90 ? `${first.slice(0,87).trimEnd()}…` : first || 'Plan de clase';
 }
 function localDraft(data, teacher) {
   const total = Number(data.duration_minutes);
@@ -356,29 +372,29 @@ function localDraft(data, teacher) {
   else if(ageRange==='12–14 años')ageGuidance='Proponer retos que conecten con su vida, colaboración, elección entre ejemplos y conversación guiada.';
   else if(ageRange==='15–18 años')ageGuidance='Incluir problemas auténticos, análisis de casos, autonomía y argumentación con evidencias.';
   else if(ageRange==='Edades variadas')ageGuidance='Ofrecer una misma consigna con apoyos visuales y niveles de reto distintos.';
-  let example = 'Usar una situación cercana a la vida del grupo relacionada con el tema y pedir que expliquen lo que observan.';
+  let example = `Usar una situación cercana a la vida del grupo relacionada con ${data.content} y pedir que expliquen lo que observan.`;
   let activity = 'En equipos, leer el contenido, seleccionar las ideas principales y organizarlas en una hoja. Cada equipo comparte una conclusión.';
   if (/matem|aritm|geometr/.test(subject)) {
     example = `Modelar en la pizarra un ejercicio breve sobre ${data.topic}; explicar en voz alta los pasos y resolver un ejemplo con participación del grupo.`;
     activity = `Resolver un ejercicio guiado sobre ${data.content}. Después, cada pareja crea o resuelve un ejemplo propio y explica cómo llegó a la respuesta.`;
   } else if (/lengua|literatura|espa|comunic/.test(subject)) {
-    example = `Leer una oración o fragmento corto relacionado con ${data.topic}; identificar oralmente una idea o elemento clave del contenido.`;
+    example = `Leer una oración o fragmento corto relacionado con ${data.content}; identificar oralmente una idea o elemento clave del contenido.`;
     activity = `Leer el fragmento o consigna, localizar ejemplos de ${data.content} y compartir una respuesta con evidencia del texto. Luego escribir una breve producción propia.`;
   } else if (/cienc|naturaleza|biolog|qu[ií]mica/.test(subject)) {
-    example = `Observar un objeto o imagen del entorno y describir sus características antes de relacionarlo con ${data.topic}.`;
+    example = `Observar un objeto o imagen del entorno y describir sus características antes de relacionarlo con ${data.content}.`;
     activity = `En equipos, observar los materiales disponibles, registrarlos en una tabla y explicar cómo se relacionan con ${data.content}. Si no hay materiales, usar dibujos o tarjetas.`;
   } else if (/social|historia|geograf|c[ií]vica/.test(subject)) {
-    example = `Ubicar ${data.topic} en una línea del tiempo, mapa o situación cotidiana, y hacer una pregunta que conecte con el contenido.`;
+    example = `Ubicar el contenido «${data.content}» en una línea del tiempo, mapa o situación cotidiana, y hacer una pregunta que conecte con el contenido.`;
     activity = `Analizar una imagen, texto breve o caso sobre ${data.content}; identificar hechos o ideas principales y organizarlos en una línea del tiempo, mapa conceptual o cuadro.`;
   }
   const plan = {
     title: data.topic, teacher: [teacher.first_name, teacher.last_name].filter(Boolean).join(' '), school: teacher.school_name, student_age_range:ageRange,
     subject: data.subject, grade: data.grade, lesson_date: data.lesson_date, duration_minutes: total, topic: data.topic,
     content: data.content, achievement_indicator: data.achievement_indicator, evaluation_criteria: evaluationCriteria,
-    resources: data.resources || teacher.teacher_context?.available_resources || 'Pizarra, cuaderno, lápiz y material visual disponible.',
+    resources: data.resources || formatResourceList(teacher.teacher_context?.available_resources) || 'Pizarra y materiales disponibles en el aula.',
     objective: `Que las y los estudiantes comprendan y trabajen ${data.content}, demostrando avances hacia este indicador: ${data.achievement_indicator}`,
     activities: [
-      { moment:'Primer momento · Iniciación', minutes:opener, activity:`Dar la bienvenida y presentar el tema «${data.topic}». Activar saberes previos con preguntas: ¿qué sabemos?, ¿dónde lo hemos visto?, ¿qué queremos descubrir? Registrar algunas ideas y acordar el propósito de la clase.`, examples:example, assessment:'Escuchar las respuestas iniciales, valorar ideas previas y aclarar vocabulario que se necesite.' },
+      { moment:'Primer momento · Iniciación', minutes:opener, activity:`Dar la bienvenida y presentar el contenido «${data.content}». Activar saberes previos con preguntas: ¿qué sabemos?, ¿dónde lo hemos visto?, ¿qué queremos descubrir? Registrar algunas ideas y acordar el propósito de la clase.`, examples:example, assessment:'Escuchar las respuestas iniciales, valorar ideas previas y aclarar vocabulario que se necesite.' },
       { moment:'Segundo momento · Desarrollo', minutes:develop, activity:`Presentar brevemente el contenido «${data.content}» usando ejemplos y apoyos visuales. Modelar cómo se resuelve o comprende una situación vinculada con el indicador. ${activity} ${ageGuidance}`, examples:example, assessment:`Observar el trabajo individual y en parejas. Hacer preguntas de seguimiento y brindar una pista o ejemplo adicional a quienes lo necesiten. Criterios a observar: ${evaluationCriteria}` },
       { moment:'Tercer momento · Culminación', minutes:close, activity:`Invitar a algunos estudiantes a compartir su respuesta o producción. Cerrar con una síntesis colectiva: cada estudiante completa oralmente o por escrito «Hoy aprendí…» y «Todavía quiero practicar…».`, examples:'Aplicar una pregunta o ejercicio corto directamente relacionado con el indicador de logro.', assessment:`Recoger una respuesta breve de cada estudiante y verificarla con el indicador: ${data.achievement_indicator}` }
     ],
@@ -393,11 +409,13 @@ function getPlanFormData() {
   const data = Object.fromEntries(new FormData($('#planForm')).entries());
   data.duration_minutes = Number(data.duration_minutes);
   data.grade = planningGradeOverride || currentProfile?.primary_grade || '';
+  data.topic = derivePlanTitle(data.content);
+  data.resources = planResourcesOverride ?? formatResourceList(currentProfile?.teacher_context?.available_resources);
   data.evaluation_criteria = suggestEvaluationCriteria(data);
   return data;
 }
 function formHasRequiredData(data) {
-  for (const key of ['subject','grade','topic','lesson_date','content','achievement_indicator']) {
+  for (const key of ['subject','grade','lesson_date','content','achievement_indicator']) {
     if (!String(data[key] || '').trim()) { $('#planForm').elements[key]?.focus(); return false; }
   }
   if (data.duration_minutes < 10 || data.duration_minutes > 600) { $('#planForm').elements.duration_minutes.focus(); return false; }
@@ -408,15 +426,15 @@ function reviewPlan(event) {
   event.preventDefault();
   const data = getPlanFormData();
   if (!data.grade) { setStatus('#planStatus', 'Elegí el grado en Mi perfil antes de preparar el plan.', 'error'); return; }
-  if (!formHasRequiredData(data)) { setStatus('#planStatus', 'Completá la asignatura, el tema, la fecha, el contenido y el indicador.', 'error'); return; }
+  if (!formHasRequiredData(data)) { setStatus('#planStatus', 'Completá la asignatura, la fecha, el contenido y el indicador.', 'error'); return; }
   pendingPlanData = data;
   const profile = currentProfile || {};
   const summary = [
     ['Asignatura', data.subject], ['Modalidad', profile.modality || '—'], ['Grado del perfil', data.grade],
     ['Edad del grupo', profile.teacher_context?.student_age_range || 'No indicada'],
-    ['Tema', data.topic], ['Fecha', prettyDate(data.lesson_date)], ['Duración', `${data.duration_minutes} minutos`],
+    ['Fecha', prettyDate(data.lesson_date)], ['Duración', `${data.duration_minutes} minutos`],
     ['Contenido', data.content], ['Indicador de logro', data.achievement_indicator],
-    ['Recursos', data.resources || profile.teacher_context?.available_resources || 'Materiales escolares básicos'],
+    ['Recursos del perfil', data.resources || 'Sin recursos marcados; se sugerirán materiales básicos.'],
     ['Criterios de evaluación', 'Se propondrán automáticamente dentro del borrador.']
   ];
   $('#planReviewDetails').innerHTML = summary.map(([label, value]) => `<div><b>${escapeHtml(label)}:</b> ${escapeHtml(value)}</div>`).join('');
@@ -478,7 +496,7 @@ async function saveCurrentPlan() {
 }
 function startPlanFromClass({ date = localISODate(), subject = '', grade = '', duration = 45 } = {}) {
   const form = $('#planForm');
-  form.reset(); form.elements.lesson_date.value = date; form.elements.duration_minutes.value = duration;
+  form.reset(); form.elements.lesson_date.value = date; form.elements.duration_minutes.value = duration; planResourcesOverride=null;
   planningGradeOverride = grade || currentProfile?.primary_grade || '';
   if (subject) setPlanSubject(subject);
   updatePlanAgeHint(currentProfile);
@@ -519,7 +537,8 @@ async function openSavedPlan(plan) {
   planningGradeOverride = plan.grade || currentProfile?.primary_grade || '';
   updatePlanAgeHint(currentProfile);
   setPlanSubject(plan.subject);
-  for (const key of ['subject','topic','lesson_date','content','achievement_indicator','duration_minutes','resources']) form.elements[key].value = plan[key] ?? '';
+  for (const key of ['subject','lesson_date','content','achievement_indicator','duration_minutes']) form.elements[key].value = plan[key] ?? '';
+  planResourcesOverride=plan.resources ?? null;
   form.classList.remove('hidden'); $('#planReview').classList.add('hidden');
   const profile = await ensureProfile();
   const body = plan.plan_body || {};
@@ -639,7 +658,7 @@ function renderCalendar() {
 }
 function renderCalendarMonth() {
   const first=new Date(calendarDate.getFullYear(),calendarDate.getMonth(),1,12);const offset=(first.getDay()+6)%7;const start=new Date(first);start.setDate(first.getDate()-offset);const days=Array.from({length:42},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d;});
-  $('#calendarBoard').innerHTML=`<div class="calendar-weekdays">${calendarWeekdays.map(day=>`<span>${day}</span>`).join('')}</div><div class="calendar-grid">${days.map(date=>{const items=getCalendarItems(date);return `<div class="calendar-cell ${date.getMonth()!==calendarDate.getMonth()?'outside':''} ${dateKey(date)===localISODate()?'today':''}"><div class="calendar-cell-head"><span>${date.getDate()}</span><button class="text-btn" data-add-date="${dateKey(date)}" aria-label="Agregar evento">+</button></div>${items.slice(0,3).map(item=>calendarEntry(item,date)).join('')}${items.length>3?`<span class="muted">+${items.length-3} más</span>`:''}</div>`;}).join('')}</div>`;
+  $('#calendarBoard').innerHTML=`<div class="calendar-board-scroll"><div class="calendar-weekdays">${calendarWeekdays.map(day=>`<span>${day}</span>`).join('')}</div><div class="calendar-grid">${days.map(date=>{const items=getCalendarItems(date);return `<div class="calendar-cell ${date.getMonth()!==calendarDate.getMonth()?'outside':''} ${dateKey(date)===localISODate()?'today':''}"><div class="calendar-cell-head"><span>${date.getDate()}</span><button class="text-btn" data-add-date="${dateKey(date)}" aria-label="Agregar evento">+</button></div>${items.slice(0,3).map(item=>calendarEntry(item,date)).join('')}${items.length>3?`<span class="muted">+${items.length-3} más</span>`:''}</div>`;}).join('')}</div></div>`;
 }
 function renderCalendarAgenda(start,count) {
   const days=Array.from({length:count},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d;});
