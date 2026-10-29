@@ -2,6 +2,54 @@
 (() => {
   const $ = (selector) => document.querySelector(selector);
   const icon = (name) => `<img class="icon" src="./icons/${name}.svg" alt="">`;
+  const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  const subjectCatalog = {
+    primary: [
+      'Creciendo en Valores','Derecho y Dignidad de las Mujeres','Educación para Aprender, Emprender, Prosperar',
+      'Estudios Sociales (Historia y Geografía)','Educación Física y Práctica Deportiva','Lengua y Literatura',
+      'Lengua Extranjera (Inglés)','Talleres de Arte y Cultura','Matemática',
+      'Ciencias Naturales (Ciencias de la Vida y el Ambiente)','Conociendo mi Mundo'
+    ],
+    secondary: [
+      'Creciendo en Valores','Derechos y Dignidad de las Mujeres','Educación Física y Práctica Deportiva',
+      'Educación para Aprender, Emprender, Prosperar','Ciencias Sociales (Geografía)','Ciencias Sociales (Historia)',
+      'Ciencias Sociales (Economía)','Ciencias Sociales (Sociología)','Ciencias Sociales (Filosofía)',
+      'Lengua y Literatura','Lengua Extranjera (Inglés y Francés)','Talleres de Arte y Cultura',
+      'Ciencias Naturales (Ciencias de la Vida y el Ambiente)','Química','Física','Biología','Matemática'
+    ]
+  };
+  const getSubjectsFor = (modality, grade) => {
+    const label = String(grade || '').toLowerCase();
+    const number = Number(label.match(/\d+/)?.[0] || 0);
+    if (modality === 'primaria') {
+      if (label === 'multigrado') return [...subjectCatalog.primary.filter(s => !s.startsWith('Estudios Sociales') && !s.startsWith('Ciencias Naturales') && s !== 'Conociendo mi Mundo'), 'Conociendo mi Mundo', 'Estudios Sociales (Historia y Geografía)', 'Ciencias Naturales (Ciencias de la Vida y el Ambiente)'];
+      if (number < 1 || number > 6) return [];
+      const shared = subjectCatalog.primary.filter(s => !s.startsWith('Estudios Sociales') && !s.startsWith('Ciencias Naturales') && s !== 'Conociendo mi Mundo');
+      return number <= 2 ? [...shared, 'Conociendo mi Mundo'] : [...shared, 'Estudios Sociales (Historia y Geografía)', 'Ciencias Naturales (Ciencias de la Vida y el Ambiente)'];
+    }
+    if (modality === 'secundaria') {
+      if (label === 'multigrado') return [...subjectCatalog.secondary];
+      if (number < 7 || number > 11) return [];
+      const gradeSpecific = new Set(['Ciencias Sociales (Geografía)','Ciencias Sociales (Historia)','Ciencias Sociales (Economía)','Ciencias Sociales (Sociología)','Ciencias Sociales (Filosofía)','Talleres de Arte y Cultura','Ciencias Naturales (Ciencias de la Vida y el Ambiente)','Química','Física','Biología']);
+      const shared = subjectCatalog.secondary.filter(s => !gradeSpecific.has(s));
+      if (number <= 9) return [...shared,'Ciencias Sociales (Geografía)','Ciencias Sociales (Historia)','Talleres de Arte y Cultura','Ciencias Naturales (Ciencias de la Vida y el Ambiente)'];
+      if (number === 10) return [...shared,'Ciencias Sociales (Economía)','Química','Física'];
+      return [...shared,'Ciencias Sociales (Sociología)','Ciencias Sociales (Filosofía)','Física','Biología'];
+    }
+    return [];
+  };
+  const selectedSubjects = (form) => [...form.querySelectorAll('input[name="subject_choice"]:checked')].map(input => input.value);
+  const populateSubjectChoices = (form, selected = selectedSubjects(form)) => {
+    const container = form.querySelector('[data-subject-choices]');
+    if (!container) return;
+    const known = new Set([...subjectCatalog.primary, ...subjectCatalog.secondary]);
+    const custom = selected.filter(subject => !known.has(subject));
+    const options = [...new Set([...getSubjectsFor(form.elements.modality?.value || '', form.elements.primary_grade?.value || ''), ...custom])];
+    container.innerHTML = options.length
+      ? options.map(subject => `<label class="choice"><input type="checkbox" name="subject_choice" value="${escapeHtml(subject)}" ${selected.includes(subject) ? 'checked' : ''}>${escapeHtml(subject)}</label>`).join('')
+      : '<span class="muted">Elegí modalidad y grado para ver las materias sugeridas. Podés agregar una asignatura propia abajo.</span>';
+  };
+  window.SyllaboSubjects = { catalog: subjectCatalog, getFor: getSubjectsFor, populateChoices: populateSubjectChoices };
   const dateToday = () => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -16,10 +64,39 @@
     const selected = field.value;
     field.innerHTML = `<option value="">Seleccioná el grado</option>${options.map(value => `<option value="${value}">${value}</option>`).join('')}<option value="Multigrado">Multigrado</option>`;
     field.value = [...options, 'Multigrado'].includes(selected) ? selected : '';
+    populateSubjectChoices(form);
   };
   ['onboardingForm', 'profileForm'].forEach((id) => {
     const form = $(`#${id}`);
-    form?.elements.modality?.addEventListener('change', () => updateGradeOptions(form));
+    if (!form) return;
+    populateSubjectChoices(form);
+    form.elements.modality?.addEventListener('change', () => {
+      const selected = selectedSubjects(form);
+      updateGradeOptions(form);
+      populateSubjectChoices(form, selected);
+    });
+    form.elements.primary_grade?.addEventListener('change', () => populateSubjectChoices(form));
+  });
+
+  document.querySelectorAll('[data-add-subject]').forEach((button) => {
+    button.dataset.subjectFallback = 'true';
+    button.addEventListener('click', () => {
+      const form = document.getElementById(button.dataset.addSubject);
+      const input = form?.elements.custom_subject;
+      const value = String(input?.value || '').trim().replace(/\s+/g, ' ');
+      if (!form || !input) return;
+      if (!value) { input.focus(); return; }
+      const selected = selectedSubjects(form);
+      const allKnown = new Set([...subjectCatalog.primary, ...subjectCatalog.secondary, ...selected].map(subject => subject.toLocaleLowerCase()));
+      if (allKnown.has(value.toLocaleLowerCase())) {
+        input.setCustomValidity('Esa materia ya está en la lista.');
+        input.reportValidity();
+        input.setCustomValidity('');
+        return;
+      }
+      populateSubjectChoices(form, [...selected, value]);
+      input.value = '';
+    });
   });
 
   document.querySelectorAll('[data-password-toggle]').forEach((button) => {
