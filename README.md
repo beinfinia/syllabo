@@ -7,7 +7,9 @@ Asistente de planificación docente con ficha de bienvenida, perfil, agenda sema
 - Registro e inicio de sesión con correo y contraseña mediante Supabase Auth.
 - Recuperación de contraseña por correo.
 - Ficha inicial de docente: nombre, apellido, género para el trato y avatar, modalidad, grado y materias que imparte.
-- Encuesta breve del entorno docente, guardada en el perfil y disponible para personalizar propuestas.
+- Encuesta breve del entorno docente, incluida la edad más frecuente del grupo; las respuestas quedan en el perfil y ayudan a adecuar actividades y ejemplos.
+- La materia se elige desde las materias guardadas por el docente y el grado se completa desde el perfil.
+- Dictado por voz en tema, contenido, indicador, criterios y recursos; usa el reconocimiento del navegador y puede enviar audio al servicio de voz de ese navegador según su configuración.
 - Biblioteca de planes con búsqueda, filtros por asignatura y mes y orden por fecha, materia o tema.
 - Horario semanal como agenda por día y hora, con un botón para establecerlo y alertas de clases que necesitan planificación.
 - Calendario con vistas de mes, semana y día; reúne clases, planes y actividades, festivales y feriados creados por el docente. Los feriados registrados omiten las clases recurrentes y las alertas de planificación de esas fechas.

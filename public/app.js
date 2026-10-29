@@ -87,12 +87,12 @@ async function openApp(user) {
     const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'docente';
     $('#welcomeTitle').textContent = `¡Hola, ${profile.gender === 'mujer' ? 'maestra' : 'maestro'} ${fullName}!`;
     if (profile.primary_grade && !$('#planForm').elements.grade.value) $('#planForm').elements.grade.value = profile.primary_grade;
-    for (const subject of profile.subjects || []) if (![...$('#subjects').options].some(option=>option.value===subject)) $('#subjects').insertAdjacentHTML('beforeend',`<option>${escapeHtml(subject)}</option>`);
+    populatePlanSubjectOptions(profile); updatePlanAgeHint(profile);
     await loadHome();
     initializedUserId = user.id; openingUserId = null;
   } catch (err) { openingUserId = null; $('#auth').classList.remove('hidden'); setStatus('#authStatus', `No se pudo cargar tu perfil: ${friendlyError(err)}`, 'error'); }
 }
-const subjectOptions = ['Lengua y Literatura','Matemáticas','Ciencias Naturales','Estudios Sociales','Educación Física','Convivencia y Civismo','Inglés','Educación Artística','Otra'];
+const subjectOptions = ['Lengua y Literatura','Matemáticas','Ciencias Naturales','Estudios Sociales','Educación Física','Convivencia y Civismo','Inglés','Educación Artística'];
 function populateSubjectChoices(form, selected = []) {
   const container = form.querySelector('[data-subject-choices]'); if (!container) return;
   container.innerHTML = subjectOptions.map((subject, index) => `<label class="choice"><input type="checkbox" name="subject_choice" value="${escapeHtml(subject)}" ${selected.includes(subject)?'checked':''}>${escapeHtml(subject)}</label>`).join('');
@@ -113,9 +113,11 @@ for (const formId of ['onboardingForm','profileForm']) {
 }
 function readProfileForm(form) {
   const data = Object.fromEntries(new FormData(form).entries());
-  data.subjects = [...form.querySelectorAll('input[name="subject_choice"]:checked')].map(input=>input.value);
+  const selectedSubjects=[...form.querySelectorAll('input[name="subject_choice"]:checked')].map(input=>input.value);
+  const customSubjects=String(data.custom_subjects||'').split(',').map(subject=>subject.trim()).filter(Boolean);
+  delete data.custom_subjects; data.subjects=[...new Set([...selectedSubjects,...customSubjects])];
   data.full_name = [data.first_name.trim(),data.last_name.trim()].filter(Boolean).join(' ');
-  data.teacher_context = Object.fromEntries(['context_zone','class_size','internet_access','available_resources','planning_challenges','preferred_dynamics'].map(key=>[key,data[key] || '']));
+  data.teacher_context = Object.fromEntries(['student_age_range','context_zone','class_size','internet_access','available_resources','planning_challenges','preferred_dynamics'].map(key=>[key,data[key] || '']));
   for (const key of Object.keys(data.teacher_context)) delete data[key];
   return data;
 }
@@ -123,9 +125,18 @@ function fillTeacherForm(form, profile) {
   for (const key of ['first_name','last_name','gender','modality','primary_grade','school_name','municipality']) if (form.elements[key]) form.elements[key].value = profile[key] || '';
   populateGradeChoices(form,profile.modality || '',profile.primary_grade || '');
   populateSubjectChoices(form,profile.subjects || []);
+  if(form.elements.custom_subjects)form.elements.custom_subjects.value=(profile.subjects||[]).filter(subject=>!subjectOptions.includes(subject)).join(', ');
   const context = profile.teacher_context || {};
-  for (const key of ['context_zone','class_size','internet_access','available_resources','planning_challenges','preferred_dynamics']) if (form.elements[key]) form.elements[key].value = context[key] || '';
+  for (const key of ['student_age_range','context_zone','class_size','internet_access','available_resources','planning_challenges','preferred_dynamics']) if (form.elements[key]) form.elements[key].value = context[key] || '';
 }
+function populatePlanSubjectOptions(profile, selected = '') {
+  const select=$('#planSubjectInput'); const subjects=profile?.subjects||[]; const value=selected||select.value;
+  select.innerHTML='<option value="">Elegí una materia de tu perfil</option>'+subjects.map(subject=>`<option value="${escapeHtml(subject)}">${escapeHtml(subject)}</option>`).join('');
+  if(value&&!subjects.includes(value))select.insertAdjacentHTML('beforeend',`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`);
+  select.value=value||'';
+}
+function setPlanSubject(value) { const select=$('#planSubjectInput'); if(![...select.options].some(option=>option.value===value))select.insertAdjacentHTML('beforeend',`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`);select.value=value; }
+function updatePlanAgeHint(profile) { const range=profile?.teacher_context?.student_age_range||'';$('#planAgeHint').textContent=range?`Adaptaremos los ejemplos y dinámicas para estudiantes de ${range}. Podés cambiar este rango en Mi perfil.`:'Indicá el rango de edad en tu perfil para adecuar las propuestas.'; }
 function setTeacherIdentity(profile) { $('#teacherAvatar').textContent = profile.gender === 'varon' ? '👨‍🏫' : '👩‍🏫'; }
 async function saveTeacherProfile(form, onboarding = false) {
   const data = readProfileForm(form);
@@ -136,9 +147,24 @@ async function saveTeacherProfile(form, onboarding = false) {
   currentProfile = saved; fillTeacherForm($('#profileForm'),saved); setTeacherIdentity(saved);
   $('#welcomeTitle').textContent = `¡Hola, ${saved.gender === 'mujer' ? 'maestra' : 'maestro'} ${saved.first_name}!`;
   if (saved.primary_grade) $('#planForm').elements.grade.value = saved.primary_grade;
+  populatePlanSubjectOptions(saved); updatePlanAgeHint(saved);
   if (onboarding) { $('#onboarding').classList.add('hidden'); $('#app').classList.remove('hidden'); await loadHome(); }
   return saved;
 }
+let activeRecognition = null;
+function startDictation(button) {
+  const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!Recognition){setStatus('#planStatus','Este navegador no ofrece dictado de voz. Probá el micrófono del teclado del celular.','error');return;}
+  if(activeRecognition){activeRecognition.stop();activeRecognition=null;}
+  const field=document.getElementById(button.dataset.dictate); const recognition=new Recognition();
+  recognition.lang='es-NI';recognition.interimResults=false;recognition.maxAlternatives=1;activeRecognition=recognition;
+  button.classList.add('listening');button.textContent='Escuchando…';button.setAttribute('aria-pressed','true');setStatus('#planStatus','Hablá ahora; al terminar, el texto aparecerá en el campo.');
+  recognition.onresult=event=>{const transcript=event.results?.[0]?.[0]?.transcript?.trim();if(transcript){field.value=`${field.value.trim()}${field.value.trim()?' ':''}${transcript}`;field.dispatchEvent(new Event('input',{bubbles:true}));}};
+  recognition.onerror=event=>{const message=event.error==='not-allowed'?'Permití el acceso al micrófono para dictar.':event.error==='no-speech'?'No detecté voz. Intentá de nuevo.':event.error==='network'?'El servicio de reconocimiento necesita conexión. Revisá internet e intentá otra vez.':'No se pudo iniciar el dictado. Revisá el micrófono e intentá de nuevo.';setStatus('#planStatus',message,'error');};
+  recognition.onend=()=>{button.classList.remove('listening');button.textContent='🎙 Dictar';button.setAttribute('aria-pressed','false');if(activeRecognition===recognition)activeRecognition=null;};
+  try{recognition.start();}catch{button.classList.remove('listening');button.textContent='🎙 Dictar';button.setAttribute('aria-pressed','false');activeRecognition=null;setStatus('#planStatus','No se pudo iniciar el micrófono. Esperá un momento e intentá de nuevo.','error');}
+}
+document.querySelectorAll('[data-dictate]').forEach(button=>button.addEventListener('click',()=>startDictation(button)));
 $('#onboardingForm').addEventListener('submit', async event => {
   event.preventDefault(); const button=$('#finishOnboarding'); button.disabled=true; setStatus('#onboardingStatus','Guardando tu perfil…');
   try { await saveTeacherProfile(event.currentTarget,true); }
@@ -241,7 +267,7 @@ function plainPlanText(plan) {
     `PLAN DE CLASE · ${plan.title || plan.topic}`,
     `Docente: ${plan.teacher || ''}`,
     `Centro educativo: ${plan.school || ''}`,
-    `Asignatura: ${plan.subject} · Grado: ${plan.grade} · Fecha: ${prettyDate(plan.lesson_date)} · Duración: ${plan.duration_minutes} minutos`,
+    `Asignatura: ${plan.subject} · Grado: ${plan.grade} · Edad de referencia: ${plan.student_age_range || 'no especificada'} · Fecha: ${prettyDate(plan.lesson_date)} · Duración: ${plan.duration_minutes} minutos`,
     `Tema: ${plan.topic}`,
     `Contenido: ${plan.content}`,
     `Indicador de logro: ${plan.achievement_indicator}`,
@@ -261,6 +287,14 @@ function localDraft(data, teacher) {
   const close = Math.max(2, Math.round(total * .2));
   const develop = total - opener - close;
   const subject = data.subject.toLowerCase();
+  const ageRange=teacher.teacher_context?.student_age_range||'';
+  let ageGuidance='';
+  if(ageRange==='3–5 años')ageGuidance='Usar objetos concretos, imágenes, consignas de un paso y juegos breves con movimiento.';
+  else if(ageRange==='6–8 años')ageGuidance='Usar ejemplos cotidianos, apoyos visuales, instrucciones cortas y actividades de manipulación o juego.';
+  else if(ageRange==='9–11 años')ageGuidance='Combinar ejemplos cercanos, retos en pareja, organizadores gráficos y explicaciones breves del razonamiento.';
+  else if(ageRange==='12–14 años')ageGuidance='Proponer retos que conecten con su vida, colaboración, elección entre ejemplos y conversación guiada.';
+  else if(ageRange==='15–18 años')ageGuidance='Incluir problemas auténticos, análisis de casos, autonomía y argumentación con evidencias.';
+  else if(ageRange==='Edades variadas')ageGuidance='Ofrecer una misma consigna con apoyos visuales y niveles de reto distintos.';
   let example = 'Usar una situación cercana a la vida del grupo relacionada con el tema y pedir que expliquen lo que observan.';
   let activity = 'En equipos, leer el contenido, seleccionar las ideas principales y organizarlas en una hoja. Cada equipo comparte una conclusión.';
   if (/matem|aritm|geometr/.test(subject)) {
@@ -277,14 +311,14 @@ function localDraft(data, teacher) {
     activity = `Analizar una imagen, texto breve o caso sobre ${data.content}; identificar hechos o ideas principales y organizarlos en una línea del tiempo, mapa conceptual o cuadro.`;
   }
   const plan = {
-    title: data.topic, teacher: [teacher.first_name, teacher.last_name].filter(Boolean).join(' '), school: teacher.school_name,
+    title: data.topic, teacher: [teacher.first_name, teacher.last_name].filter(Boolean).join(' '), school: teacher.school_name, student_age_range:ageRange,
     subject: data.subject, grade: data.grade, lesson_date: data.lesson_date, duration_minutes: total, topic: data.topic,
     content: data.content, achievement_indicator: data.achievement_indicator, evaluation_criteria: data.evaluation_criteria,
     resources: data.resources || teacher.teacher_context?.available_resources || 'Pizarra, cuaderno, lápiz y material visual disponible.',
     objective: `Que las y los estudiantes comprendan y trabajen ${data.content}, demostrando avances hacia este indicador: ${data.achievement_indicator}`,
     activities: [
-      { moment:'Primer momento · Iniciación', minutes:opener, activity:`Dar la bienvenida y presentar el tema «${data.topic}». Activar saberes previos con preguntas: ¿qué sabemos?, ¿dónde lo hemos visto?, ¿qué queremos descubrir? Registrar algunas ideas y acordar el propósito de la clase.`, examples, assessment:'Escuchar las respuestas iniciales, valorar ideas previas y aclarar vocabulario que se necesite.' },
-      { moment:'Segundo momento · Desarrollo', minutes:develop, activity:`Presentar brevemente el contenido «${data.content}» usando ejemplos y apoyos visuales. Modelar cómo se resuelve o comprende una situación vinculada con el indicador. ${activity}`, examples, assessment:`Observar el trabajo individual y en parejas. Hacer preguntas de seguimiento y brindar una pista o ejemplo adicional a quienes lo necesiten. Criterios a observar: ${data.evaluation_criteria || 'comprende el contenido, participa y explica sus respuestas.'}` },
+      { moment:'Primer momento · Iniciación', minutes:opener, activity:`Dar la bienvenida y presentar el tema «${data.topic}». Activar saberes previos con preguntas: ¿qué sabemos?, ¿dónde lo hemos visto?, ¿qué queremos descubrir? Registrar algunas ideas y acordar el propósito de la clase.`, examples:example, assessment:'Escuchar las respuestas iniciales, valorar ideas previas y aclarar vocabulario que se necesite.' },
+      { moment:'Segundo momento · Desarrollo', minutes:develop, activity:`Presentar brevemente el contenido «${data.content}» usando ejemplos y apoyos visuales. Modelar cómo se resuelve o comprende una situación vinculada con el indicador. ${activity} ${ageGuidance}`, examples:example, assessment:`Observar el trabajo individual y en parejas. Hacer preguntas de seguimiento y brindar una pista o ejemplo adicional a quienes lo necesiten. Criterios a observar: ${data.evaluation_criteria || 'comprende el contenido, participa y explica sus respuestas.'}` },
       { moment:'Tercer momento · Culminación', minutes:close, activity:`Invitar a algunos estudiantes a compartir su respuesta o producción. Cerrar con una síntesis colectiva: cada estudiante completa oralmente o por escrito «Hoy aprendí…» y «Todavía quiero practicar…».`, examples:'Aplicar una pregunta o ejercicio corto directamente relacionado con el indicador de logro.', assessment:`Recoger una respuesta breve de cada estudiante y verificarla con el indicador: ${data.achievement_indicator}` }
     ],
     evidence:`Producción o respuesta individual relacionada con «${data.content}», explicación oral del procedimiento y participación en la actividad. Revisar con estos criterios: ${data.evaluation_criteria || 'comprensión, participación y explicación de la respuesta.'}`,
@@ -328,7 +362,7 @@ function renderPlanPreview(plan, source = 'guided') {
   const text = plan.text || plainPlanText(plan);
   generatedPlanText = text;
   const badge = source === 'ai' ? '<span class="pill green">Propuesta con IA</span>' : '<span class="pill blue-pill">Borrador guiado</span>';
-  $('#planPreview').innerHTML = `<div class="plan-paper"><pre id="printBody" class="print-body"></pre><div class="plan-heading"><div class="brand" style="justify-content:center;font-size:17px"><img class="mark" src="./logo.svg" alt="">Syllabo</div><p class="eyebrow" style="margin:8px 0 3px">Planificación didáctica</p><h2>${escapeHtml(plan.topic || plan.title || 'Plan de clase')}</h2>${badge}</div><div class="plan-meta"><div><b>Docente:</b> ${escapeHtml(plan.teacher || '')}</div><div><b>Centro:</b> ${escapeHtml(plan.school || '—')}</div><div><b>Asignatura:</b> ${escapeHtml(plan.subject || '')}</div><div><b>Grado:</b> ${escapeHtml(plan.grade || '')}</div><div><b>Fecha:</b> ${escapeHtml(prettyDate(plan.lesson_date) || '')}</div><div><b>Duración:</b> ${escapeHtml(plan.duration_minutes || '')} minutos</div></div><div class="plan-block"><h3>Contenido e indicador</h3><p><b>Contenido:</b> ${escapeHtml(plan.content || '')}</p><p><b>Indicador de logro:</b> ${escapeHtml(plan.achievement_indicator || '')}</p><p><b>Criterios de evaluación:</b> ${escapeHtml(plan.evaluation_criteria || 'Observar la participación, el procedimiento y el aprendizaje demostrado.')}</p><p><b>Propósito:</b> ${escapeHtml(plan.objective || '')}</p></div><div class="plan-block"><h3>Secuencia didáctica</h3>${splitActivities(plan).map(item=>`<div class="activity"><strong>${escapeHtml(item.moment || 'Actividad')} · ${escapeHtml(item.minutes || 0)} min</strong><p>${escapeHtml(item.activity || '')}</p>${item.examples?`<p><b>Ejemplo:</b> ${escapeHtml(item.examples)}</p>`:''}${item.assessment?`<p><b>Verificación y realimentación:</b> ${escapeHtml(item.assessment)}</p>`:''}</div>`).join('')}</div><div class="plan-block"><h3>Evaluación y atención a la diversidad</h3><p><b>Evidencias:</b> ${escapeHtml(plan.evidence || '')}</p><p><b>Apoyos y ajustes:</b> ${escapeHtml(plan.differentiation || '')}</p><p><b>Recursos:</b> ${escapeHtml(plan.resources || '')}</p>${plan.homework?`<p><b>Actividad de aplicación:</b> ${escapeHtml(plan.homework)}</p>`:''}</div><div class="plan-block"><h3>Editar el plan</h3><textarea id="planEditor" aria-label="Editar plan de clase">${escapeHtml(text)}</textarea><p class="muted">Podés editar este borrador antes de guardarlo o imprimirlo.</p></div><div class="row noprint"><button id="savePlan" class="primary">${currentPlanId?'Guardar cambios':'Guardar en mis planes'}</button><button id="printPlan" class="soft-btn">Imprimir / Guardar PDF</button><button id="discardPlan" class="text-btn">Cerrar</button></div><div id="saveStatus" class="status" aria-live="polite"></div></div>`;
+  $('#planPreview').innerHTML = `<div class="plan-paper"><pre id="printBody" class="print-body"></pre><div class="plan-heading"><div class="brand" style="justify-content:center;font-size:17px"><img class="mark" src="./logo.svg" alt="">Syllabo</div><p class="eyebrow" style="margin:8px 0 3px">Planificación didáctica</p><h2>${escapeHtml(plan.topic || plan.title || 'Plan de clase')}</h2>${badge}</div><div class="plan-meta"><div><b>Docente:</b> ${escapeHtml(plan.teacher || '')}</div><div><b>Centro:</b> ${escapeHtml(plan.school || '—')}</div><div><b>Asignatura:</b> ${escapeHtml(plan.subject || '')}</div><div><b>Grado:</b> ${escapeHtml(plan.grade || '')}</div><div><b>Edad:</b> ${escapeHtml(plan.student_age_range || '—')}</div><div><b>Fecha:</b> ${escapeHtml(prettyDate(plan.lesson_date) || '')}</div><div><b>Duración:</b> ${escapeHtml(plan.duration_minutes || '')} minutos</div></div><div class="plan-block"><h3>Contenido e indicador</h3><p><b>Contenido:</b> ${escapeHtml(plan.content || '')}</p><p><b>Indicador de logro:</b> ${escapeHtml(plan.achievement_indicator || '')}</p><p><b>Criterios de evaluación:</b> ${escapeHtml(plan.evaluation_criteria || 'Observar la participación, el procedimiento y el aprendizaje demostrado.')}</p><p><b>Propósito:</b> ${escapeHtml(plan.objective || '')}</p></div><div class="plan-block"><h3>Secuencia didáctica</h3>${splitActivities(plan).map(item=>`<div class="activity"><strong>${escapeHtml(item.moment || 'Actividad')} · ${escapeHtml(item.minutes || 0)} min</strong><p>${escapeHtml(item.activity || '')}</p>${item.examples?`<p><b>Ejemplo:</b> ${escapeHtml(item.examples)}</p>`:''}${item.assessment?`<p><b>Verificación y realimentación:</b> ${escapeHtml(item.assessment)}</p>`:''}</div>`).join('')}</div><div class="plan-block"><h3>Evaluación y atención a la diversidad</h3><p><b>Evidencias:</b> ${escapeHtml(plan.evidence || '')}</p><p><b>Apoyos y ajustes:</b> ${escapeHtml(plan.differentiation || '')}</p><p><b>Recursos:</b> ${escapeHtml(plan.resources || '')}</p>${plan.homework?`<p><b>Actividad de aplicación:</b> ${escapeHtml(plan.homework)}</p>`:''}</div><div class="plan-block"><h3>Editar el plan</h3><textarea id="planEditor" aria-label="Editar plan de clase">${escapeHtml(text)}</textarea><p class="muted">Podés editar este borrador antes de guardarlo o imprimirlo.</p></div><div class="row noprint"><button id="savePlan" class="primary">${currentPlanId?'Guardar cambios':'Guardar en mis planes'}</button><button id="printPlan" class="soft-btn">Imprimir / Guardar PDF</button><button id="discardPlan" class="text-btn">Cerrar</button></div><div id="saveStatus" class="status" aria-live="polite"></div></div>`;
   $('#planEditor').addEventListener('input', event => { generatedPlanText = event.target.value; });
   $('#savePlan').addEventListener('click', saveCurrentPlan);
   $('#printPlan').addEventListener('click', () => { generatedPlanText = $('#planEditor').value; $('#printBody').textContent = generatedPlanText; window.print(); });
@@ -367,9 +401,9 @@ function populatePlanMonths(plans) {
   select.innerHTML = '<option value="">Todas las fechas</option>' + months.map(month => `<option value="${month}">${escapeHtml(new Date(`${month}-15T12:00:00`).toLocaleDateString('es-NI',{month:'long',year:'numeric'}))}</option>`).join('');
   if (months.includes(selected)) select.value = selected;
 }
-function populatePlanSubjects(plans) { const select=$('#planSubject'); const selected=select.value; const values=[...new Set(plans.map(p=>p.subject).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));select.innerHTML='<option value="">Todas las asignaturas</option>'+values.map(value=>`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');if(values.includes(selected))select.value=selected; }
+function populatePlanSubjects(plans) { const select=$('#planSubjectFilter'); const selected=select.value; const values=[...new Set(plans.map(p=>p.subject).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));select.innerHTML='<option value="">Todas las asignaturas</option>'+values.map(value=>`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');if(values.includes(selected))select.value=selected; }
 function renderPlanList() {
-  const search = $('#planSearch').value.trim().toLocaleLowerCase(); const month = $('#planMonth').value; const subject=$('#planSubject').value; const sort=$('#planSort').value;
+  const search = $('#planSearch').value.trim().toLocaleLowerCase(); const month = $('#planMonth').value; const subject=$('#planSubjectFilter').value; const sort=$('#planSort').value;
   const plans = allPlans.filter(p => (!month || p.lesson_date.startsWith(month)) && (!subject || p.subject===subject) && (!search || `${p.subject} ${p.grade} ${p.topic}`.toLocaleLowerCase().includes(search)));
   plans.sort((a,b)=>sort==='subject'?a.subject.localeCompare(b.subject,'es')||a.topic.localeCompare(b.topic,'es'):sort==='topic'?a.topic.localeCompare(b.topic,'es'):sort==='date-asc'?a.lesson_date.localeCompare(b.lesson_date):b.lesson_date.localeCompare(a.lesson_date));
   if (!plans.length) { $('#plansList').innerHTML = '<div class="empty">No encontramos planes con esos filtros. Creá tu primer plan para empezar.</div>'; return; }
@@ -377,10 +411,11 @@ function renderPlanList() {
   plans.forEach(plan => $(`[data-open-plan="${plan.id}"]`).addEventListener('click', () => openSavedPlan(plan)));
   plans.forEach(plan => $(`[data-delete-plan="${plan.id}"]`).addEventListener('click', () => deletePlan(plan)));
 }
-$('#planSearch').addEventListener('input', renderPlanList); $('#planMonth').addEventListener('change', renderPlanList); $('#planSubject').addEventListener('change',renderPlanList); $('#planSort').addEventListener('change',renderPlanList);
+$('#planSearch').addEventListener('input', renderPlanList); $('#planMonth').addEventListener('change', renderPlanList); $('#planSubjectFilter').addEventListener('change',renderPlanList); $('#planSort').addEventListener('change',renderPlanList);
 async function openSavedPlan(plan) {
   currentPlanId = plan.id;
   const form = $('#planForm');
+  setPlanSubject(plan.subject);
   for (const key of ['subject','grade','topic','lesson_date','content','achievement_indicator','evaluation_criteria','duration_minutes','resources']) form.elements[key].value = plan[key] ?? '';
   const profile = await ensureProfile();
   const body = plan.plan_body || {};
@@ -497,7 +532,7 @@ function bindCalendarEntries() {
   $('#calendarBoard').querySelectorAll('[data-edit-event]').forEach(button=>button.addEventListener('click',()=>{const event=allCalendarEvents.find(item=>item.id===button.dataset.editEvent);if(event)openCalendarEventForm(event);}));
   $('#calendarBoard').querySelectorAll('[data-delete-event]').forEach(button=>button.addEventListener('click',async()=>{const event=allCalendarEvents.find(item=>item.id===button.dataset.deleteEvent);if(!event||!confirm(`¿Eliminar “${event.title}” del calendario?`))return;const {error}=await supabase.from('calendar_events').delete().eq('id',event.id);if(error)alert(friendlyError(error));else loadCalendar();}));
   $('#calendarBoard').querySelectorAll('[data-calendar-plan]').forEach(button=>button.addEventListener('click',()=>{const plan=allCalendarPlans.find(item=>item.id===button.dataset.calendarPlan);if(plan)openSavedPlan(plan);}));
-  $('#calendarBoard').querySelectorAll('[data-calendar-class]').forEach(button=>button.addEventListener('click',()=>{const form=$('#planForm');form.reset();form.elements.lesson_date.value=button.dataset.calendarClass;form.elements.subject.value=button.dataset.subject;form.elements.grade.value=button.dataset.grade;form.elements.duration_minutes.value=button.dataset.duration;$('#planPreview').innerHTML='';currentPlanId=null;showPage('crear');}));
+  $('#calendarBoard').querySelectorAll('[data-calendar-class]').forEach(button=>button.addEventListener('click',()=>{const form=$('#planForm');form.reset();form.elements.lesson_date.value=button.dataset.calendarClass;setPlanSubject(button.dataset.subject);form.elements.grade.value=button.dataset.grade;form.elements.duration_minutes.value=button.dataset.duration;$('#planPreview').innerHTML='';currentPlanId=null;showPage('crear');}));
 }
 
 $('#profileForm').addEventListener('submit', async event => {
@@ -532,7 +567,7 @@ async function loadHome() {
   for(const {date,item} of classDates){const key=dateKey(date);if(!plans.some(plan=>samePlan(plan,key,item.subject,item.grade)))upcoming.push({date,key,item});}
   const alerts=upcoming.slice(0,5);
   $('#planningAlerts').innerHTML=alerts.length?alerts.map(({date,key,item})=>`<article class="item"><div class="row"><span class="pill">Por planear</span><b>${escapeHtml(date.toLocaleDateString('es-NI',{weekday:'short',day:'numeric',month:'short'}))}</b><span>${escapeHtml(item.subject)} · ${escapeHtml(item.grade)}</span><button class="blue" data-plan-class="${escapeHtml(key)}" data-subject="${escapeHtml(item.subject)}" data-grade="${escapeHtml(item.grade)}" data-duration="${item.duration_minutes}">Crear plan</button></div></article>`).join(''):'<div class="empty">¡Bien! Las próximas clases ya tienen un plan guardado.</div>';
-  $('#planningAlerts').querySelectorAll('[data-plan-class]').forEach(button=>button.addEventListener('click',()=>{const form=$('#planForm');form.reset();form.elements.lesson_date.value=button.dataset.planClass;form.elements.subject.value=button.dataset.subject;form.elements.grade.value=button.dataset.grade;form.elements.duration_minutes.value=button.dataset.duration;$('#planPreview').innerHTML='';currentPlanId=null;showPage('crear');}));
+  $('#planningAlerts').querySelectorAll('[data-plan-class]').forEach(button=>button.addEventListener('click',()=>{const form=$('#planForm');form.reset();form.elements.lesson_date.value=button.dataset.planClass;setPlanSubject(button.dataset.subject);form.elements.grade.value=button.dataset.grade;form.elements.duration_minutes.value=button.dataset.duration;$('#planPreview').innerHTML='';currentPlanId=null;showPage('crear');}));
 }
 
 let recoveringPassword = false;
@@ -556,7 +591,7 @@ $('#planForm').elements.lesson_date.addEventListener('change', async event => {
   const { data } = await supabase.from('class_schedules').select('subject,grade,duration_minutes').eq('weekday',weekday).order('start_time');
   if (!data?.length) return;
   const selected = data[0]; const form = $('#planForm');
-  if (!form.elements.subject.value) form.elements.subject.value = selected.subject;
+  if (!form.elements.subject.value) setPlanSubject(selected.subject);
   if (!form.elements.grade.value) form.elements.grade.value = selected.grade;
   if (!form.elements.duration_minutes.value || form.elements.duration_minutes.value === '45') form.elements.duration_minutes.value = selected.duration_minutes;
 });
