@@ -31,6 +31,12 @@ Sirve la carpeta `public/` con cualquier servidor estático. La app utiliza Supa
 
 No requiere build ni variables de entorno para publicar la versión web. Configurá en Supabase Auth las URL autorizadas del dominio de Pages, incluida la URL de producción.
 
+## Verificación por correo
+
+La URL de retorno de registro y recuperación es `https://syllabo-7hj.pages.dev/`, incluso si la cuenta se creó desde `localhost`. En **Supabase → Authentication → URL Configuration**, poné esa dirección como **Site URL** y agregala a **Redirect URLs**. Supabase debe permitir la redirección para que el enlace abra el sitio publicado.
+
+El remitente puede seguir apareciendo como Supabase mientras se use el correo SMTP predeterminado. Para que el correo diga Syllabo hace falta configurar SMTP propio en Supabase Auth y un remitente/dominio verificado; cambiar solo la plantilla no cambia el proveedor del remitente.
+
 ## IA externa
 
 La app actualmente prepara el borrador dentro del navegador, sin mandar el contenido de las clases a un servicio externo. El endpoint de IA incluido en `supabase/functions/generate-lesson-plan/` todavía no está desplegado. Para activarlo primero hay que decidir qué proveedor se usará, autorizar el envío de los datos necesarios y definir el límite de gasto; una clave de OpenAI puede generar cargos y no se paga automáticamente con créditos de AWS.
