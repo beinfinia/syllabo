@@ -10,8 +10,10 @@ Asistente de planificación docente con ficha de bienvenida, perfil, agenda sema
 - Materias sugeridas según modalidad y grado; el docente puede agregar asignaturas de su centro.
 - Encuesta breve del entorno docente, incluida la edad más frecuente del grupo; las respuestas quedan en el perfil y ayudan a adecuar actividades y ejemplos.
 - La materia se elige desde las materias guardadas por el docente y el grado se completa desde el perfil.
+- Antes de generar, se muestra un resumen de asignatura, grado del perfil, tema, fecha, contenido, indicador, duración y recursos para revisar o corregir.
+- El formulario no pide grado ni criterios de evaluación: el grado se toma del perfil o del bloque horario seleccionado y los criterios se proponen automáticamente a partir del contenido y el indicador.
 - Iconos Lucide 0.468.0 locales para dictado por voz, mostrar/ocultar contraseña y acciones; están en `public/icons/` y no dependen de un CDN.
-- Dictado por voz en tema, contenido, indicador, criterios y recursos; usa el reconocimiento del navegador en Chrome o Edge, requiere permiso de micrófono y conexión a internet.
+- Dictado por voz en tema, contenido, indicador y recursos; usa el reconocimiento del navegador en Chrome o Edge, requiere permiso de micrófono y conexión a internet.
 - Biblioteca de planes con búsqueda, filtros por asignatura y mes y orden por fecha, materia o tema.
 - Horario semanal como agenda por día y hora, con un botón para establecerlo y alertas de clases que necesitan planificación.
 - Calendario con vistas de mes, semana y día; reúne clases, planes y actividades, festivales y feriados creados por el docente. Los feriados registrados omiten las clases recurrentes y las alertas de planificación de esas fechas.
@@ -63,6 +65,6 @@ Se pueden añadir asignaturas propias del centro, modalidad o programa del docen
 
 ## IA externa
 
-La app actualmente prepara el borrador dentro del navegador, sin mandar el contenido de las clases a un servicio externo. El endpoint de IA incluido en `supabase/functions/generate-lesson-plan/` todavía no está desplegado. Para activarlo primero hay que decidir qué proveedor se usará, autorizar el envío de los datos necesarios y definir el límite de gasto; una clave de OpenAI puede generar cargos y no se paga automáticamente con créditos de AWS.
+La app actualmente prepara el borrador guiado y criterios sugeridos dentro del navegador, sin mandar el contenido de las clases a un servicio externo. El endpoint de IA incluido en `supabase/functions/generate-lesson-plan/` todavía no está desplegado. Para activar generación con IA primero hay que decidir qué proveedor se usará, autorizar el envío de los datos necesarios y definir el límite de gasto; una clave de OpenAI puede generar cargos y no se paga automáticamente con créditos de AWS.
 
 La migración de onboarding y calendario ya se aplicó al proyecto Supabase conectado. Para otra instancia, aplicá las migraciones en `supabase/migrations/` en orden.
