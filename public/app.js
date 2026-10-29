@@ -2,10 +2,16 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 
 const SUPABASE_URL = 'https://rrptfgdshlrfongkfppv.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_VIbLFUuvaksiYulO8-CuCQ_zRY92zUp';
+const PRODUCTION_APP_URL = 'https://syllabo-7hj.pages.dev/';
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
 const weekdays = { 1:'Lunes', 2:'Martes', 3:'Miércoles', 4:'Jueves', 5:'Viernes' };
+function authRedirectTo() {
+  const hostname = window.location.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') return PRODUCTION_APP_URL;
+  return `${window.location.origin}/`;
+}
 let currentUser = null;
 let isSignup = false;
 let currentPlanId = null;
@@ -97,7 +103,7 @@ $('#authForm').addEventListener('submit', async event => {
       const first_name = String(form.get('first_name') || '').trim();
       const last_name = String(form.get('last_name') || '').trim();
       const full_name = [first_name, last_name].filter(Boolean).join(' ');
-      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { first_name, last_name, full_name }, emailRedirectTo: window.location.origin } });
+      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { first_name, last_name, full_name }, emailRedirectTo: authRedirectTo() } });
       if (error) throw error;
       if (data.session && data.user) await openApp(data.user);
       else setStatus('#authStatus', 'Cuenta creada. Revisá tu correo y confirmá el registro antes de ingresar.', 'ok');
@@ -112,7 +118,7 @@ $('#forgotPassword').addEventListener('click', async () => {
   const email = $('#authForm').elements.email.value.trim();
   if (!email) { setStatus('#authStatus', 'Escribí tu correo para enviarte el enlace de recuperación.', 'error'); $('#authForm').elements.email.focus(); return; }
   setStatus('#authStatus', 'Enviando enlace…');
-  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/` });
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: authRedirectTo() });
   if (error) setStatus('#authStatus', friendlyError(error), 'error');
   else setStatus('#authStatus', 'Si el correo está registrado, recibirás un enlace para cambiar tu contraseña.', 'ok');
 });
