@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title desc">
+  <title id="title">Símbolo de Syllabo</title>
+  <desc id="desc">Una S dinámica azul y violeta con acentos magenta y verde.</desc>
+  <defs>
+    <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4B35D0"/>
+      <stop offset=".48" stop-color="#D82BD1"/>
+      <stop offset="1" stop-color="#89BC62"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1=".12" x2="1" y2=".9">
+      <stop offset="0" stop-color="#5939D4"/>
+      <stop offset=".5" stop-color="#315ED6"/>
+      <stop offset="1" stop-color="#2475C8"/>
+    </linearGradient>
+    <linearGradient id="ribbons" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#89BC62"/>
+      <stop offset=".52" stop-color="#DD35D0"/>
+      <stop offset="1" stop-color="#6839D0"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="url(#ribbons)" stroke-width="8" stroke-linecap="butt" stroke-linejoin="round">
+    <path d="M62 78c0 31 14 54 39 70"/>
+    <path d="M49 90c0 33 16 59 42 77"/>
+    <path d="M37 103c0 35 16 64 44 83"/>
+    <path d="M78 214c36 11 74 4 101-18"/>
+    <path d="M67 227c42 12 84 4 115-23"/>
+  </g>
+  <path fill="url(#sweep)" d="M156 19h61l-34 39h-31c-25 0-41 14-41 34 0 14 9 23 28 29l20 7c11 4 17 12 17 22 0 17-13 28-31 28-13 0-24-6-34-17l-12-13C87 136 81 122 81 106c0-50 31-87 75-87Z"/>
+  <path fill="url(#body)" d="M128 105c12-13 25-15 40-7l16 9c18 10 28 26 28 47 0 38-33 64-78 64H39l35-39h58c20 0 31-9 31-24 0-9-5-16-16-21l-18-8c-12-5-14-13-1-21Z"/>
+</svg>
