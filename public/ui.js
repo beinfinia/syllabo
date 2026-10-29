@@ -3,6 +3,8 @@
   const $ = (selector) => document.querySelector(selector);
   const icon = (name) => `<img class="icon" src="./icons/${name}.svg" alt="">`;
   const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  const normalizeSubjectName = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const uniqueSubjects = (values) => { const seen=new Set(); return values.filter(value=>{const key=normalizeSubjectName(value);if(!key||seen.has(key))return false;seen.add(key);return true;}); };
   const subjectCatalog = {
     primary: [
       'Creciendo en Valores','Derecho y Dignidad de las Mujeres','Educación para Aprender, Emprender, Prosperar',
@@ -22,36 +24,37 @@
     const label = String(grade || '').toLowerCase();
     const number = Number(label.match(/\d+/)?.[0] || 0);
     if (modality === 'primaria') {
-      if (label === 'multigrado') return [...subjectCatalog.primary.filter(s => !s.startsWith('Estudios Sociales') && !s.startsWith('Ciencias Naturales') && s !== 'Conociendo mi Mundo'), 'Conociendo mi Mundo', 'Estudios Sociales (Historia y Geografía)', 'Ciencias Naturales (Ciencias de la Vida y el Ambiente)'];
+      if (label === 'multigrado') return uniqueSubjects([...subjectCatalog.primary.filter(s => !s.startsWith('Estudios Sociales') && !s.startsWith('Ciencias Naturales') && s !== 'Conociendo mi Mundo'), 'Conociendo mi Mundo', 'Estudios Sociales (Historia y Geografía)', 'Ciencias Naturales (Ciencias de la Vida y el Ambiente)']);
       if (number < 1 || number > 6) return [];
       const shared = subjectCatalog.primary.filter(s => !s.startsWith('Estudios Sociales') && !s.startsWith('Ciencias Naturales') && s !== 'Conociendo mi Mundo');
-      return number <= 2 ? [...shared, 'Conociendo mi Mundo'] : [...shared, 'Estudios Sociales (Historia y Geografía)', 'Ciencias Naturales (Ciencias de la Vida y el Ambiente)'];
+      return uniqueSubjects(number <= 2 ? [...shared, 'Conociendo mi Mundo'] : [...shared, 'Estudios Sociales (Historia y Geografía)', 'Ciencias Naturales (Ciencias de la Vida y el Ambiente)']);
     }
     if (modality === 'secundaria') {
-      if (label === 'multigrado') return [...subjectCatalog.secondary];
+      if (label === 'multigrado') return uniqueSubjects([...subjectCatalog.secondary]);
       if (number < 7 || number > 11) return [];
       const gradeSpecific = new Set(['Ciencias Sociales (Geografía)','Ciencias Sociales (Historia)','Ciencias Sociales (Economía)','Ciencias Sociales (Sociología)','Ciencias Sociales (Filosofía)','Talleres de Arte y Cultura','Ciencias Naturales (Ciencias de la Vida y el Ambiente)','Química','Física','Biología']);
       const shared = subjectCatalog.secondary.filter(s => !gradeSpecific.has(s));
-      if (number <= 9) return [...shared,'Ciencias Sociales (Geografía)','Ciencias Sociales (Historia)','Talleres de Arte y Cultura','Ciencias Naturales (Ciencias de la Vida y el Ambiente)'];
-      if (number === 10) return [...shared,'Ciencias Sociales (Economía)','Química','Física'];
-      return [...shared,'Ciencias Sociales (Sociología)','Ciencias Sociales (Filosofía)','Física','Biología'];
+      if (number <= 9) return uniqueSubjects([...shared,'Ciencias Sociales (Geografía)','Ciencias Sociales (Historia)','Talleres de Arte y Cultura','Ciencias Naturales (Ciencias de la Vida y el Ambiente)']);
+      if (number === 10) return uniqueSubjects([...shared,'Ciencias Sociales (Economía)','Química','Física']);
+      return uniqueSubjects([...shared,'Ciencias Sociales (Sociología)','Ciencias Sociales (Filosofía)','Física','Biología']);
     }
     return [];
   };
-  const selectedSubjects = (form) => [...form.querySelectorAll('input[name="subject_choice"]:checked')].map(input => input.value);
+  const selectedSubjects = (form) => uniqueSubjects([...form.querySelectorAll('input[name="subject_choice"]:checked')].map(input => input.value));
   const populateSubjectChoices = (form, selected = selectedSubjects(form)) => {
     const container = form.querySelector('[data-subject-choices]');
     if (!container) return;
-    const known = new Set([...subjectCatalog.primary, ...subjectCatalog.secondary]);
-    const custom = selected.filter(subject => !known.has(subject));
-    const options = [...new Set([...getSubjectsFor(form.elements.modality?.value || '', form.elements.primary_grade?.value || ''), ...custom])];
+    const known = new Set([...subjectCatalog.primary, ...subjectCatalog.secondary].map(normalizeSubjectName));
+    const custom = selected.filter(subject => !known.has(normalizeSubjectName(subject)));
+    const options = uniqueSubjects([...getSubjectsFor(form.elements.modality?.value || '', form.elements.primary_grade?.value || ''), ...custom]);
+    const selectedKeys=new Set(selected.map(normalizeSubjectName));
     container.innerHTML = options.length
-      ? options.map(subject => `<label class="choice"><input type="checkbox" name="subject_choice" value="${escapeHtml(subject)}" ${selected.includes(subject) ? 'checked' : ''}>${escapeHtml(subject)}</label>`).join('')
+      ? options.map(subject => `<label class="choice"><input type="checkbox" name="subject_choice" value="${escapeHtml(subject)}" ${selectedKeys.has(normalizeSubjectName(subject)) ? 'checked' : ''}>${escapeHtml(subject)}</label>`).join('')
       : '<span class="muted">Elegí modalidad y grado para ver las materias sugeridas. Podés agregar una asignatura propia abajo.</span>';
   };
-  window.SyllaboSubjects = { catalog: subjectCatalog, getFor: getSubjectsFor, populateChoices: populateSubjectChoices };
+  window.SyllaboSubjects = { catalog: subjectCatalog, getFor: getSubjectsFor, populateChoices: populateSubjectChoices, normalizeName: normalizeSubjectName, unique: uniqueSubjects };
   const resourceCatalog = [
-    'Pizarra y marcadores/tiza','Libros de texto','Cuadernos y lápices','Hojas y cartulinas','Láminas e imágenes','Tarjetas y fichas','Material concreto o manipulativo','Materiales reciclados y del entorno','Proyector o televisor','Computadora o tableta','Acceso a internet','Biblioteca o rincón de lectura','Patio o espacio abierto'
+    'Pizarra y marcadores/tiza','Libros de texto','Cuadernos y lápices','Hojas y cartulinas','Láminas e imágenes','Tarjetas y fichas','Material concreto o manipulativo','Materiales reciclados y del entorno','Proyector o televisor','Sonido / parlante','Computadora o tableta','Acceso a internet','Biblioteca o rincón de lectura','Patio o espacio abierto'
   ];
   const normalizeResources = (values) => {
     const list = Array.isArray(values) ? values : String(values || '').split(/[,;\n]+/);
@@ -103,8 +106,8 @@
       if (!form || !input) return;
       if (!value) { input.focus(); return; }
       const selected = selectedSubjects(form);
-      const allKnown = new Set([...subjectCatalog.primary, ...subjectCatalog.secondary, ...selected].map(subject => subject.toLocaleLowerCase()));
-      if (allKnown.has(value.toLocaleLowerCase())) {
+      const allKnown = new Set([...subjectCatalog.primary, ...subjectCatalog.secondary, ...selected].map(normalizeSubjectName));
+      if (allKnown.has(normalizeSubjectName(value))) {
         input.setCustomValidity('Esa materia ya está en la lista.');
         input.reportValidity();
         input.setCustomValidity('');

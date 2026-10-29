@@ -115,12 +115,13 @@ async function openApp(user) {
 const subjectCatalog = window.SyllaboSubjects.catalog;
 const getSubjectsFor = window.SyllaboSubjects.getFor;
 const populateSubjectChoices = window.SyllaboSubjects.populateChoices;
-function getSelectedSubjects(form) { return [...form.querySelectorAll('input[name="subject_choice"]:checked')].map(input => input.value); }
+function getSelectedSubjects(form) { return window.SyllaboSubjects.unique([...form.querySelectorAll('input[name="subject_choice"]:checked')].map(input => input.value)); }
 function addCustomSubject(form) {
   const input = form.elements.custom_subject; const value = String(input.value || '').trim().replace(/\s+/g, ' ');
   if (!value) { input.focus(); return; }
   const selected = getSelectedSubjects(form);
-  const duplicate = [...subjectCatalog.primary, ...subjectCatalog.secondary, ...selected].some(subject => subject.toLocaleLowerCase() === value.toLocaleLowerCase());
+  const normalize=window.SyllaboSubjects.normalizeName;
+  const duplicate = [...subjectCatalog.primary, ...subjectCatalog.secondary, ...selected].some(subject => normalize(subject) === normalize(value));
   if (duplicate) { input.setCustomValidity('Esa materia ya está en la lista.'); input.reportValidity(); input.setCustomValidity(''); return; }
   populateSubjectChoices(form, [...selected, value]); input.value = '';
 }
@@ -148,9 +149,9 @@ function populateScheduleGradeOptions(profile = currentProfile, selected = '') {
 function populateScheduleSubjectSuggestions(profile = currentProfile, grade = '') {
   const list = $('#scheduleSubjects');
   if (!list) return;
-  const known = new Set([...subjectCatalog.primary, ...subjectCatalog.secondary]);
-  const custom = (profile?.subjects || []).filter(subject => !known.has(subject));
-  const options = [...new Set([...getSubjectsFor(profile?.modality || '', grade || profile?.primary_grade || ''), ...custom])];
+  const known = new Set([...subjectCatalog.primary, ...subjectCatalog.secondary].map(window.SyllaboSubjects.normalizeName));
+  const custom = (profile?.subjects || []).filter(subject => !known.has(window.SyllaboSubjects.normalizeName(subject)));
+  const options = window.SyllaboSubjects.unique([...getSubjectsFor(profile?.modality || '', grade || profile?.primary_grade || ''), ...custom]);
   list.innerHTML = options.map(subject => `<option value="${escapeHtml(subject)}"></option>`).join('');
 }
 for (const formId of ['onboardingForm','profileForm']) {
@@ -188,7 +189,7 @@ function fillTeacherForm(form, profile) {
   if(form.elements.other_resources) form.elements.other_resources.value=customResources.join(', ');
 }
 function populatePlanSubjectOptions(profile, selected = '') {
-  const select=$('#planSubjectInput'); const subjects=profile?.subjects||[]; const value=selected||select.value;
+  const select=$('#planSubjectInput'); const subjects=window.SyllaboSubjects.unique(profile?.subjects||[]); const value=selected||select.value;
   select.innerHTML='<option value="">Elegí una materia de tu perfil</option>'+subjects.map(subject=>`<option value="${escapeHtml(subject)}">${escapeHtml(subject)}</option>`).join('');
   if(value&&!subjects.includes(value))select.insertAdjacentHTML('beforeend',`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`);
   select.value=value||'';
@@ -326,20 +327,33 @@ function splitActivities(plan) {
 }
 function plainPlanText(plan) {
   const lines = [
-    `PLAN DE CLASE · ${plan.title || plan.topic}`,
-    `Docente: ${plan.teacher || ''}`,
-    `Centro educativo: ${plan.school || ''}`,
-    `Asignatura: ${plan.subject} · Grado: ${plan.grade} · Edad de referencia: ${plan.student_age_range || 'no especificada'} · Fecha: ${prettyDate(plan.lesson_date)} · Duración: ${plan.duration_minutes} minutos`,
-    `Contenido: ${plan.content}`,
-    `Indicador de logro: ${plan.achievement_indicator}`,
-    `Criterios de evaluación: ${plan.evaluation_criteria || 'Observar la participación, el procedimiento y el aprendizaje demostrado.'}`,
-    '', 'PROPÓSITO DE APRENDIZAJE', plan.objective || `Desarrollar el contenido «${plan.content}» para avanzar hacia el indicador de logro.`, '',
-    'SECUENCIA DIDÁCTICA'
+    `PLAN DE CLASE | ${plan.subject || 'Asignatura'}`,
+    `Docente: ${plan.teacher || ''}    Grado: ${plan.grade || ''}`,
+    `Fecha: ${prettyDate(plan.lesson_date)}    Duración: ${plan.duration_minutes || 0} minutos`,
+    '', 'INDICADOR DE LOGRO', plan.achievement_indicator || '',
+    `Contenido: ${plan.content || ''}`,
+    `Propósito: ${plan.objective || `Trabajar ${plan.content || 'el contenido'} y avanzar hacia el indicador de logro.`}`,
+    '', 'RECURSOS Y PREPARACIÓN', plan.preparation || plan.resources || 'Preparar pizarra, cuaderno y ejemplos del entorno.'
   ];
-  for (const activity of splitActivities(plan)) lines.push('', `${activity.moment || ''} (${activity.minutes || 0} min)`, activity.activity || '', activity.examples ? `Ejemplo: ${activity.examples}` : '', activity.assessment ? `Verificación y realimentación: ${activity.assessment}` : '');
-  lines.push('', 'EVALUACIÓN Y EVIDENCIAS', plan.evidence || 'Recoger las producciones y respuestas del grupo, y contrastarlas con los criterios definidos.', '', 'ATENCIÓN A LA DIVERSIDAD', plan.differentiation || 'Ofrecer apoyo visual, modelar los pasos y permitir explicar las respuestas oralmente o por escrito.', '', `RECURSOS: ${plan.resources || 'Pizarra, cuaderno y lápiz.'}`);
-  if (plan.homework) lines.push('', 'ACTIVIDAD DE APLICACIÓN', plan.homework);
-  lines.push('', 'Borrador para revisión docente. Adecuar al programa de estudio y a las características del grupo.');
+  for (const activity of splitActivities(plan)) {
+    lines.push('', `${activity.moment || 'Actividad'} | ${activity.minutes || 0} minutos`);
+    if (Array.isArray(activity.steps) && activity.steps.length) {
+      activity.steps.forEach(step => lines.push(`${step.label || 'Actividad'} (${step.minutes || 0} min): ${step.detail || ''}`));
+    } else {
+      lines.push(activity.activity || '');
+      if (activity.examples) lines.push(`Ejemplo: ${activity.examples}`);
+      if (activity.assessment) lines.push(`Observación: ${activity.assessment}`);
+    }
+  }
+  const worksheet = plan.worksheet || buildWorksheet(plan);
+  const checklist = plan.evaluation_checklist || String(plan.evaluation_criteria || '').split(/\n/).map(text => text.trim()).filter(Boolean);
+  lines.push('', 'FICHA Y EVALUACIÓN', 'Nombre: ____________________________________    Fecha: __________________', worksheet.instructions || 'Resuelve las actividades y explica tus respuestas.');
+  (worksheet.tasks || []).forEach((task, index) => lines.push('', `${index + 1}. ${task}`));
+  lines.push('', 'Lista de cotejo para la docente');
+  checklist.forEach(criterion => lines.push(`[ ] ${criterion}    Sí: ____    En proceso: ____`));
+  lines.push('', 'RESPUESTAS ORIENTATIVAS Y APOYO', plan.answer_guide || 'Las respuestas pueden variar; verificar que se relacionen con el contenido y demuestren el indicador de logro.', `Adecuación: ${plan.differentiation || 'Dar instrucciones paso a paso, ofrecer apoyo visual y permitir responder oralmente o por escrito.'}`);
+  if (plan.teacher_note) lines.push(`Nota docente: ${plan.teacher_note}`);
+  lines.push('', 'Borrador para revisión docente. Ajustar ejemplos y ficha al programa de estudio y a las características del grupo.');
   return lines.join('\n');
 }
 function suggestEvaluationCriteria(data) {
@@ -357,52 +371,104 @@ function derivePlanTitle(content='') {
   const first=String(content).trim().split(/\n|[.!?](?:\s|$)/)[0].trim();
   return first.length>90 ? `${first.slice(0,87).trimEnd()}…` : first || 'Plan de clase';
 }
+function buildWorksheet(data) {
+  const subject=String(data.subject || '').toLowerCase();
+  let tasks;
+  if (/matem|aritm|geometr/.test(subject)) tasks=[
+    `Resuelve un ejercicio de «${data.content || 'este contenido'}» trabajado en clase y muestra tus pasos: ________________________________`,
+    `Crea un ejemplo propio relacionado con «${data.content || 'este contenido'}» y explica cómo lo resolviste.`,
+    `¿Qué paso o idea te ayudó más? Escríbelo con tus palabras.`
+  ];
+  else if (/lengua|literatura|espa|comunic|inglés|francés/.test(subject)) tasks=[
+    `Lee el texto breve seleccionado por la docente. Identifica dos ejemplos de «${data.content || 'este contenido'}» y cópialos.`,
+    `Explica qué función o idea cumple «${data.content || 'este contenido'}» en el texto.`,
+    `Escribe una oración o respuesta propia usando lo aprendido.`
+  ];
+  else if (/cienc|naturaleza|biolog|qu[ií]mica|física/.test(subject)) tasks=[
+    `Observa los ejemplos presentados y clasifica o describe cada uno según «${data.content || 'este contenido'}».`,
+    `Elige un ejemplo y explica por qué corresponde a esa clasificación o concepto.`,
+    `Menciona una situación de la vida diaria en la que se observe lo aprendido.`
+  ];
+  else if (/social|historia|geograf|c[ií]vica/.test(subject)) tasks=[
+    `Lee la fuente, imagen o mapa seleccionado. Escribe dos ideas relacionadas con «${data.content || 'este contenido'}».`,
+    `Organiza la información en el orden o lugar que corresponda y explica tu decisión.`,
+    `Relaciona lo estudiado con una persona, lugar o situación de la comunidad.`
+  ];
+  else tasks=[
+    `Explica con tus propias palabras una idea importante de «${data.content || 'este contenido'}».`,
+    `Resuelve o completa una actividad que demuestre el indicador de logro. Explica cómo lo hiciste.`,
+    `Da un ejemplo de cómo se relaciona lo aprendido con la vida diaria.`
+  ];
+  return {instructions:'Resuelve las actividades. Usa el contenido trabajado en clase y explica tus respuestas.',tasks};
+}
 function localDraft(data, teacher) {
-  const total = Number(data.duration_minutes);
-  const opener = Math.max(2, Math.round(total * .2));
-  const close = Math.max(2, Math.round(total * .2));
-  const develop = total - opener - close;
-  const subject = data.subject.toLowerCase();
-  const evaluationCriteria = data.evaluation_criteria || suggestEvaluationCriteria(data);
+  const total=Math.max(10,Number(data.duration_minutes)||45);
+  const subject=String(data.subject||'').toLowerCase();
+  let opener=Math.max(2,Math.round(total*.18));
+  let develop=Math.max(3,Math.round(total*.60));
+  let close=total-opener-develop;
+  if(close<2){develop-=2-close;close=2;}
+  let explain=Math.max(1,Math.round(develop*.30));
+  let collaborative=Math.max(1,Math.round(develop*.45));
+  let independent=develop-explain-collaborative;
+  if(independent<1){collaborative=Math.max(1,collaborative+independent-1);independent=develop-explain-collaborative;}
+  const socialization=Math.max(1,Math.round(close*.5));
+  const exit=close-socialization;
+  const evaluationCriteria=data.evaluation_criteria||suggestEvaluationCriteria(data);
+  const checklist=evaluationCriteria.split('\n').map(item=>item.trim()).filter(Boolean);
   const ageRange=teacher.teacher_context?.student_age_range||'';
-  let ageGuidance='';
-  if(ageRange==='3–5 años')ageGuidance='Usar objetos concretos, imágenes, consignas de un paso y juegos breves con movimiento.';
-  else if(ageRange==='6–8 años')ageGuidance='Usar ejemplos cotidianos, apoyos visuales, instrucciones cortas y actividades de manipulación o juego.';
-  else if(ageRange==='9–11 años')ageGuidance='Combinar ejemplos cercanos, retos en pareja, organizadores gráficos y explicaciones breves del razonamiento.';
-  else if(ageRange==='12–14 años')ageGuidance='Proponer retos que conecten con su vida, colaboración, elección entre ejemplos y conversación guiada.';
-  else if(ageRange==='15–18 años')ageGuidance='Incluir problemas auténticos, análisis de casos, autonomía y argumentación con evidencias.';
-  else if(ageRange==='Edades variadas')ageGuidance='Ofrecer una misma consigna con apoyos visuales y niveles de reto distintos.';
-  let example = `Usar una situación cercana a la vida del grupo relacionada con ${data.content} y pedir que expliquen lo que observan.`;
-  let activity = 'En equipos, leer el contenido, seleccionar las ideas principales y organizarlas en una hoja. Cada equipo comparte una conclusión.';
-  if (/matem|aritm|geometr/.test(subject)) {
-    example = `Modelar en la pizarra un ejercicio breve sobre ${data.topic}; explicar en voz alta los pasos y resolver un ejemplo con participación del grupo.`;
-    activity = `Resolver un ejercicio guiado sobre ${data.content}. Después, cada pareja crea o resuelve un ejemplo propio y explica cómo llegó a la respuesta.`;
-  } else if (/lengua|literatura|espa|comunic/.test(subject)) {
-    example = `Leer una oración o fragmento corto relacionado con ${data.content}; identificar oralmente una idea o elemento clave del contenido.`;
-    activity = `Leer el fragmento o consigna, localizar ejemplos de ${data.content} y compartir una respuesta con evidencia del texto. Luego escribir una breve producción propia.`;
-  } else if (/cienc|naturaleza|biolog|qu[ií]mica/.test(subject)) {
-    example = `Observar un objeto o imagen del entorno y describir sus características antes de relacionarlo con ${data.content}.`;
-    activity = `En equipos, observar los materiales disponibles, registrarlos en una tabla y explicar cómo se relacionan con ${data.content}. Si no hay materiales, usar dibujos o tarjetas.`;
-  } else if (/social|historia|geograf|c[ií]vica/.test(subject)) {
-    example = `Ubicar el contenido «${data.content}» en una línea del tiempo, mapa o situación cotidiana, y hacer una pregunta que conecte con el contenido.`;
-    activity = `Analizar una imagen, texto breve o caso sobre ${data.content}; identificar hechos o ideas principales y organizarlos en una línea del tiempo, mapa conceptual o cuadro.`;
+  const ageGuidance=ageRange==='3–5 años'?'Usar objetos concretos, imágenes, consignas de un paso y juegos breves con movimiento.':ageRange==='6–8 años'?'Usar ejemplos cotidianos, apoyo visual e instrucciones breves.':ageRange==='9–11 años'?'Combinar ejemplos cercanos, organizadores gráficos y explicación del razonamiento.':ageRange==='12–14 años'?'Proponer retos conectados con su vida, colaboración y conversación guiada.':ageRange==='15–18 años'?'Incluir problemas auténticos, análisis de casos y argumentación con evidencias.':ageRange==='Edades variadas'?'Ofrecer apoyos y niveles de reto distintos para una misma consigna.':'Dar instrucciones breves, modelar un ejemplo y comprobar la comprensión.';
+  const resources=data.resources||formatResourceList(teacher.teacher_context?.available_resources)||'Pizarra, cuaderno, lápiz y ejemplos del entorno.';
+  const resourceParts=resources.split(/,\s*/).map(item=>item.toLocaleLowerCase());
+  const soundNote=resourceParts.some(item=>item.includes('sonido')||item.includes('parlante'))?' Si se usará audio o video, comprobar antes que el sonido del parlante se escuche con claridad.':'';
+  const prep=`Organizar con anticipación: ${resources}. Preparar ejemplos, tarjetas, imágenes o una lectura corta vinculados con «${data.content}».${soundNote}${teacher.teacher_context?.internet_access==='Sin acceso en el aula'?' Tener una alternativa impresa o dibujada para no depender de internet.':''}`;
+  let warmup=`Dinámica «¿Qué sabemos?»: mostrar una imagen, objeto o situación de la comunidad relacionada con «${data.content}». Preguntar qué observan, qué saben y dónde lo han visto. Escuchar ideas, presentar el propósito y recuperar vocabulario clave.`;
+  let explainDetail=`Presentar «${data.content}» en pasos breves. Modelar un ejemplo y relacionarlo con el indicador: «${data.achievement_indicator}». Invitar al grupo a explicar qué observa o qué estrategia propone.`;
+  let teamDetail=`En parejas o equipos, trabajar con ejemplos de «${data.content}». Comparar respuestas, explicar por qué corresponden y hacer ajustes después de la conversación.`;
+  let practiceDetail=`Resolver la ficha individual de la sección siguiente. Leer las instrucciones en voz alta y permitir consultar el ejemplo modelado.`;
+  if(/matem|aritm|geometr/.test(subject)){
+    warmup=`Dinámica «Resolvamos juntos»: presentar una situación cotidiana vinculada con «${data.content}». Pedir al grupo que proponga maneras de resolverla y explique su razonamiento.`;
+    explainDetail=`Modelar en la pizarra un ejercicio breve de «${data.content}». Pensar en voz alta, explicar los pasos y resolver un segundo ejemplo con participación del grupo.`;
+    teamDetail=`En parejas, resolver ejercicios cortos de «${data.content}». Cada estudiante explica un paso y compara el procedimiento con su compañero o compañera.`;
+  } else if(/lengua|literatura|espa|comunic|inglés|francés/.test(subject)){
+    warmup=`Dinámica «Leemos y descubrimos»: leer una oración o fragmento corto relacionado con «${data.content}». Preguntar qué palabras o ideas llaman la atención y por qué.`;
+    explainDetail=`Leer un ejemplo y modelar cómo reconocer o utilizar «${data.content}». Explicar la estrategia con palabras sencillas y comprobarla con el indicador.`;
+    teamDetail=`En parejas, leer un fragmento breve, localizar ejemplos de «${data.content}» y justificar la respuesta usando una parte del texto.`;
+  } else if(/cienc|naturaleza|biolog|qu[ií]mica|física/.test(subject)){
+    warmup=`Dinámica «Observamos el entorno»: mostrar dos o tres objetos, imágenes o muestras seguras. Preguntar qué tienen en común y cómo se relacionan con «${data.content}».`;
+    explainDetail=`Observar y explicar «${data.content}» con objetos, dibujos o imágenes. Modelar cómo describir o clasificar un ejemplo y conectar la explicación con el indicador.`;
+    teamDetail=`En equipos, clasificar, comparar o registrar ejemplos de «${data.content}» en una tabla o cartel. Cada equipo explica una decisión y escucha comentarios.`;
+  } else if(/social|historia|geograf|c[ií]vica/.test(subject)){
+    warmup=`Dinámica «Pistas del pasado o del lugar»: observar una imagen, mapa o fuente breve relacionada con «${data.content}». Preguntar qué información aporta y qué quisieran saber.`;
+    explainDetail=`Ubicar «${data.content}» en el tiempo, lugar o contexto que corresponda. Modelar la lectura de un mapa, imagen o fuente y distinguir las ideas principales.`;
+    teamDetail=`En equipos, analizar una imagen, mapa o texto breve sobre «${data.content}». Ordenar hechos o ideas y compartir una conclusión con evidencia.`;
   }
-  const plan = {
-    title: data.topic, teacher: [teacher.first_name, teacher.last_name].filter(Boolean).join(' '), school: teacher.school_name, student_age_range:ageRange,
-    subject: data.subject, grade: data.grade, lesson_date: data.lesson_date, duration_minutes: total, topic: data.topic,
-    content: data.content, achievement_indicator: data.achievement_indicator, evaluation_criteria: evaluationCriteria,
-    resources: data.resources || formatResourceList(teacher.teacher_context?.available_resources) || 'Pizarra y materiales disponibles en el aula.',
-    objective: `Que las y los estudiantes comprendan y trabajen ${data.content}, demostrando avances hacia este indicador: ${data.achievement_indicator}`,
-    activities: [
-      { moment:'Primer momento · Iniciación', minutes:opener, activity:`Dar la bienvenida y presentar el contenido «${data.content}». Activar saberes previos con preguntas: ¿qué sabemos?, ¿dónde lo hemos visto?, ¿qué queremos descubrir? Registrar algunas ideas y acordar el propósito de la clase.`, examples:example, assessment:'Escuchar las respuestas iniciales, valorar ideas previas y aclarar vocabulario que se necesite.' },
-      { moment:'Segundo momento · Desarrollo', minutes:develop, activity:`Presentar brevemente el contenido «${data.content}» usando ejemplos y apoyos visuales. Modelar cómo se resuelve o comprende una situación vinculada con el indicador. ${activity} ${ageGuidance}`, examples:example, assessment:`Observar el trabajo individual y en parejas. Hacer preguntas de seguimiento y brindar una pista o ejemplo adicional a quienes lo necesiten. Criterios a observar: ${evaluationCriteria}` },
-      { moment:'Tercer momento · Culminación', minutes:close, activity:`Invitar a algunos estudiantes a compartir su respuesta o producción. Cerrar con una síntesis colectiva: cada estudiante completa oralmente o por escrito «Hoy aprendí…» y «Todavía quiero practicar…».`, examples:'Aplicar una pregunta o ejercicio corto directamente relacionado con el indicador de logro.', assessment:`Recoger una respuesta breve de cada estudiante y verificarla con el indicador: ${data.achievement_indicator}` }
+  const objective=`Que las y los estudiantes comprendan «${data.content}» y demuestren avances hacia el indicador: ${data.achievement_indicator}`;
+  const worksheet=buildWorksheet(data);
+  const answerGuide=`Las respuestas pueden variar. Aceptar las que se relacionen con «${data.content}» y demuestren el indicador. Si una consigna admite varias respuestas, pedir al estudiante que explique su razonamiento.`;
+  const teacherNote='Adecuar los ejemplos al programa de estudio y a lo que el grupo ya ha trabajado. Permitir responder oralmente, por escrito o con un dibujo cuando sea pertinente.';
+  const differentiation=`${ageGuidance}${teacher.teacher_context?.internet_access==='Sin acceso en el aula'?' Priorizar los materiales impresos, los objetos del entorno y las actividades sin conexión.':''}${teacher.teacher_context?.planning_challenges?` Considerar el desafío señalado por el docente: ${teacher.teacher_context.planning_challenges}.`:''}`;
+  const plan={
+    title:derivePlanTitle(data.content),teacher:[teacher.first_name,teacher.last_name].filter(Boolean).join(' '),school:teacher.school_name,
+    student_age_range:ageRange,subject:data.subject,grade:data.grade,lesson_date:data.lesson_date,duration_minutes:total,
+    topic:derivePlanTitle(data.content),content:data.content,achievement_indicator:data.achievement_indicator,
+    evaluation_criteria:evaluationCriteria,evaluation_checklist:checklist,resources,preparation:prep,objective,worksheet,answer_guide:answerGuide,teacher_note:teacherNote,
+    activities:[
+      {moment:'1. Inicio',minutes:opener,steps:[{label:'Dinámica de activación',minutes:opener,detail:warmup}]},
+      {moment:'2. Desarrollo',minutes:develop,steps:[
+        {label:'Explorar y explicar',minutes:explain,detail:explainDetail},
+        {label:'Actividad colaborativa',minutes:collaborative,detail:teamDetail},
+        {label:'Práctica individual',minutes:independent,detail:practiceDetail}
+      ]},
+      {moment:'3. Cierre',minutes:close,steps:[
+        {label:'Socialización',minutes:socialization,detail:'Revisar algunas respuestas o producciones. Preguntar cómo llegaron a la respuesta y aclarar errores frecuentes con un ejemplo breve.'},
+        {label:'Salida',minutes:exit,detail:`Cada estudiante comparte o escribe una idea que aprendió y un ejemplo relacionado con «${data.content}». Registrar avances usando la lista de cotejo.`}
+      ]}
     ],
-    evidence:`Producción o respuesta individual relacionada con «${data.content}», explicación oral del procedimiento y participación en la actividad. Revisar con estos criterios: ${evaluationCriteria}`,
-    differentiation:`Presentar instrucciones cortas en pasos; mostrar un ejemplo resuelto; apoyar con imágenes u objetos; permitir trabajar con una pareja de apoyo; ofrecer una consigna de ampliación a quien termine antes.${teacher.teacher_context?.internet_access==='Sin acceso en el aula'?' Priorizar materiales impresos, objetos del entorno y actividades que no requieran conexión.':''}${teacher.teacher_context?.planning_challenges?` Considerar el desafío que señaló el docente: ${teacher.teacher_context.planning_challenges}`:''}`,
-    homework:''
+    evidence:`Ficha individual, explicaciones durante el trabajo colaborativo y respuesta de salida, cotejadas con el indicador: ${data.achievement_indicator}`,
+    differentiation,homework:''
   };
-  plan.text = plainPlanText(plan);
+  plan.text=plainPlanText(plan);
   return plan;
 }
 function getPlanFormData() {
@@ -467,14 +533,19 @@ $('#generatePlan').addEventListener('click', async () => {
   finally { button.disabled = false; }
 });
 function renderPlanPreview(plan, source = 'guided') {
-  const text = plan.text || plainPlanText(plan);
-  generatedPlanText = text;
-  const badge = source === 'ai' ? '<span class="pill green">Propuesta con IA</span>' : '<span class="pill blue-pill">Borrador guiado</span>';
-  $('#planPreview').innerHTML = `<div class="plan-paper"><pre id="printBody" class="print-body"></pre><div class="plan-heading"><div class="brand" style="justify-content:center;font-size:17px"><img class="mark" src="./logo.svg" alt="">Syllabo</div><p class="eyebrow" style="margin:8px 0 3px">Planificación didáctica</p><h2>${escapeHtml(plan.topic || plan.title || 'Plan de clase')}</h2>${badge}</div><div class="plan-meta"><div><b>Docente:</b> ${escapeHtml(plan.teacher || '')}</div><div><b>Centro:</b> ${escapeHtml(plan.school || '—')}</div><div><b>Asignatura:</b> ${escapeHtml(plan.subject || '')}</div><div><b>Grado:</b> ${escapeHtml(plan.grade || '')}</div><div><b>Edad:</b> ${escapeHtml(plan.student_age_range || '—')}</div><div><b>Fecha:</b> ${escapeHtml(prettyDate(plan.lesson_date) || '')}</div><div><b>Duración:</b> ${escapeHtml(plan.duration_minutes || '')} minutos</div></div><div class="plan-block"><h3>Contenido e indicador</h3><p><b>Contenido:</b> ${escapeHtml(plan.content || '')}</p><p><b>Indicador de logro:</b> ${escapeHtml(plan.achievement_indicator || '')}</p><p><b>Criterios de evaluación:</b> ${escapeHtml(plan.evaluation_criteria || 'Observar la participación, el procedimiento y el aprendizaje demostrado.')}</p><p><b>Propósito:</b> ${escapeHtml(plan.objective || '')}</p></div><div class="plan-block"><h3>Secuencia didáctica</h3>${splitActivities(plan).map(item=>`<div class="activity"><strong>${escapeHtml(item.moment || 'Actividad')} · ${escapeHtml(item.minutes || 0)} min</strong><p>${escapeHtml(item.activity || '')}</p>${item.examples?`<p><b>Ejemplo:</b> ${escapeHtml(item.examples)}</p>`:''}${item.assessment?`<p><b>Verificación y realimentación:</b> ${escapeHtml(item.assessment)}</p>`:''}</div>`).join('')}</div><div class="plan-block"><h3>Evaluación y atención a la diversidad</h3><p><b>Evidencias:</b> ${escapeHtml(plan.evidence || '')}</p><p><b>Apoyos y ajustes:</b> ${escapeHtml(plan.differentiation || '')}</p><p><b>Recursos:</b> ${escapeHtml(plan.resources || '')}</p>${plan.homework?`<p><b>Actividad de aplicación:</b> ${escapeHtml(plan.homework)}</p>`:''}</div><div class="plan-block"><h3>Editar el plan</h3><textarea id="planEditor" aria-label="Editar plan de clase">${escapeHtml(text)}</textarea><p class="muted">Podés editar este borrador antes de guardarlo o imprimirlo.</p></div><div class="row noprint"><button id="savePlan" class="primary">${currentPlanId?'Guardar cambios':'Guardar en mis planes'}</button><button id="printPlan" class="soft-btn">Imprimir / Guardar PDF</button><button id="discardPlan" class="text-btn">Cerrar</button></div><div id="saveStatus" class="status" aria-live="polite"></div></div>`;
-  $('#planEditor').addEventListener('input', event => { generatedPlanText = event.target.value; });
-  $('#savePlan').addEventListener('click', saveCurrentPlan);
-  $('#printPlan').addEventListener('click', () => { generatedPlanText = $('#planEditor').value; $('#printBody').textContent = generatedPlanText; window.print(); });
-  $('#discardPlan').addEventListener('click', () => { $('#planPreview').innerHTML = ''; currentPlanId = null; generatedPlanText = ''; generatedPlanData = null; });
+  const structuredText=plainPlanText(plan);
+  const text=plan.text||structuredText;
+  generatedPlanText=text;
+  const badge=source==='ai'?'<span class="pill green">Propuesta con IA</span>':'<span class="pill blue-pill">Borrador guiado</span>';
+  const checklist=plan.evaluation_checklist||String(plan.evaluation_criteria||'').split(/\n/).map(value=>value.trim()).filter(Boolean);
+  const worksheet=plan.worksheet||buildWorksheet(plan);
+  const activities=splitActivities(plan).map(item=>`<article class="activity"><h3>${escapeHtml(item.moment||'Actividad')} · ${escapeHtml(item.minutes||0)} min</h3>${Array.isArray(item.steps)&&item.steps.length?item.steps.map(step=>`<p><b>${escapeHtml(step.label||'Actividad')} (${escapeHtml(step.minutes||0)} min):</b> ${escapeHtml(step.detail||'')}</p>`).join(''):`<p>${escapeHtml(item.activity||'')}</p>${item.examples?`<p><b>Ejemplo:</b> ${escapeHtml(item.examples)}</p>`:''}${item.assessment?`<p><b>Observación:</b> ${escapeHtml(item.assessment)}</p>`:''}`}</article>`).join('');
+  const checkRows=checklist.map(item=>`<tr><td>${escapeHtml(item)}</td><td>____</td><td>____</td></tr>`).join('');
+  $('#planPreview').innerHTML=`<div class="plan-paper"><pre id="printBody" class="print-body"></pre><div id="printStructured" class="print-structured"><div class="plan-heading"><div class="brand" style="justify-content:center;font-size:17px"><img class="mark" src="./logo.svg" alt="">Syllabo</div><p class="eyebrow" style="margin:8px 0 3px">Planificación didáctica</p><h2>Plan de clase | ${escapeHtml(plan.subject||'')}</h2>${badge}</div><div class="plan-meta"><div><b>Docente:</b> ${escapeHtml(plan.teacher||'')}</div><div><b>Grado:</b> ${escapeHtml(plan.grade||'')}</div><div><b>Fecha:</b> ${escapeHtml(prettyDate(plan.lesson_date)||'')}</div><div><b>Duración:</b> ${escapeHtml(plan.duration_minutes||'')} minutos</div>${plan.school?`<div><b>Centro educativo:</b> ${escapeHtml(plan.school)}</div>`:''}${plan.student_age_range?`<div><b>Edad de referencia:</b> ${escapeHtml(plan.student_age_range)}</div>`:''}</div><section class="plan-block"><h3>Indicador de logro</h3><p>${escapeHtml(plan.achievement_indicator||'')}</p><p><b>Contenido:</b> ${escapeHtml(plan.content||'')}</p><p><b>Propósito:</b> ${escapeHtml(plan.objective||'')}</p></section><section class="plan-block"><h3>Recursos y preparación</h3><p>${escapeHtml(plan.preparation||plan.resources||'Preparar pizarra, cuaderno y ejemplos del entorno.')}</p></section><section class="plan-block"><h3>Secuencia didáctica</h3>${activities}</section><section class="plan-block worksheet-section"><h3>Ficha y evaluación</h3><p>Nombre: ____________________________________ &nbsp; Fecha: __________________</p><p>${escapeHtml(worksheet.instructions||'Resuelve las actividades y explica tus respuestas.')}</p><ol>${(worksheet.tasks||[]).map(task=>`<li>${escapeHtml(task)}<p class="answer-lines">________________________________________________________________________</p></li>`).join('')}</ol><h3>Lista de cotejo para la docente</h3><table class="checklist-table"><thead><tr><th>Criterio observable</th><th>Sí</th><th>En proceso</th></tr></thead><tbody>${checkRows}</tbody></table></section><section class="plan-block"><h3>Respuestas orientativas y apoyo</h3><p>${escapeHtml(plan.answer_guide||'Las respuestas pueden variar; revisar que se relacionen con el contenido y el indicador.')}</p><p><b>Adecuación:</b> ${escapeHtml(plan.differentiation||'Dar instrucciones paso a paso, ofrecer apoyo visual y permitir responder oralmente o por escrito.')}</p>${plan.teacher_note?`<p><b>Nota docente:</b> ${escapeHtml(plan.teacher_note)}</p>`:''}</section></div><section class="plan-block editor-block"><h3>Editar el plan</h3><textarea id="planEditor" aria-label="Editar plan de clase">${escapeHtml(text)}</textarea><p class="muted">Revisá y ajustá la propuesta antes de guardarla o imprimirla.</p></section><div class="row noprint"><button id="savePlan" class="primary">${currentPlanId?'Guardar cambios':'Guardar en mis planes'}</button><button id="printPlan" class="soft-btn">Imprimir / Guardar PDF</button><button id="discardPlan" class="text-btn">Cerrar</button></div><div id="saveStatus" class="status" aria-live="polite"></div></div>`;
+  $('#planEditor').addEventListener('input',event=>{generatedPlanText=event.target.value;});
+  $('#savePlan').addEventListener('click',saveCurrentPlan);
+  $('#printPlan').addEventListener('click',()=>{generatedPlanText=$('#planEditor').value;const paper=$('#planPreview .plan-paper');const edited=generatedPlanText.trim()!==structuredText.trim();paper.classList.toggle('print-text-only',edited);$('#printBody').textContent=generatedPlanText;window.print();paper.classList.remove('print-text-only');});
+  $('#discardPlan').addEventListener('click',()=>{$('#planPreview').innerHTML='';currentPlanId=null;generatedPlanText='';generatedPlanData=null;});
 }
 async function saveCurrentPlan() {
   const data = getPlanFormData();

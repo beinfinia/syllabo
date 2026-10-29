@@ -7,7 +7,7 @@ Asistente de planificación docente con ficha de bienvenida, perfil, agenda sema
 - Registro e inicio de sesión con correo y contraseña mediante Supabase Auth.
 - Recuperación de contraseña por correo con formulario de solicitud y cambio de contraseña.
 - Ficha inicial obligatoria en una ventana modal: nombre, apellido, género para el trato y avatar, modalidad, grado, materias y contexto docente. Se vuelve a mostrar si se sale antes de completarla.
-- Materias sugeridas según modalidad y grado; el docente puede agregar asignaturas de su centro.
+- Materias sugeridas según modalidad y grado; se eliminan duplicados aunque cambien mayúsculas o tildes. El docente puede agregar asignaturas de su centro.
 - Encuesta breve del entorno docente, incluida la edad más frecuente del grupo; las respuestas quedan en el perfil y ayudan a adecuar actividades y ejemplos.
 - La materia se elige desde las materias guardadas por el docente y el grado se completa desde el perfil.
 - Antes de generar, se muestra un resumen de asignatura, grado del perfil, fecha, contenido, indicador, duración y recursos del perfil para revisar.
@@ -20,7 +20,7 @@ Asistente de planificación docente con ficha de bienvenida, perfil, agenda sema
 - Horario de lunes a viernes, con varias clases por día.
 - Sugerencia de asignatura, grado y duración del horario al escoger fecha del plan.
 - Generación local de un borrador guiado sin enviar la información de la clase a un proveedor de IA.
-- Tres momentos de clase con distribución exacta de minutos, ejemplos, dinámicas, evaluación y apoyos.
+- Plan con indicador, contenido, propósito, recursos y preparación; inicio, desarrollo y cierre con minutos que suman exactamente la duración; ficha de trabajo, lista de cotejo y respuestas orientativas/apoyos. La distribución de secciones sigue la plantilla compartida por la docente.
 - Edición, guardado, búsqueda, apertura, eliminación e impresión del plan a PDF.
 - Datos aislados por cuenta con Row Level Security (RLS).
 
@@ -28,7 +28,7 @@ Asistente de planificación docente con ficha de bienvenida, perfil, agenda sema
 
 La vista se adapta a teléfonos: navegación inferior con iconos, controles táctiles amplios, formularios en una columna y calendario desplazable. Usa la paleta y tipografía de Syllabo, con avatares ilustrados según el perfil.
 
-Los recursos de aula se seleccionan al completar el perfil y se guardan en `teacher_context.available_resources` de Supabase. Se pueden activar o desactivar desde Mi perfil; el formulario del plan toma esa lista automáticamente.
+Los recursos de aula (incluido sonido/parlante) se seleccionan al completar el perfil y se guardan en `teacher_context.available_resources` de Supabase. Se pueden activar o desactivar desde Mi perfil; el formulario del plan toma esa lista automáticamente.
 
 ## Base de datos
 
