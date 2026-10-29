@@ -22,8 +22,14 @@ async function ensureProfile() {
   const { data, error } = await supabase.from('teacher_profiles').select('*').eq('id', currentUser.id).maybeSingle();
   if (error) throw error;
   if (data) return data;
-  const name = currentUser.user_metadata?.full_name || '';
-  const { data: created, error: insertError } = await supabase.from('teacher_profiles').insert({ id: currentUser.id, full_name: name }).select().single();
+  const metadata = currentUser.user_metadata || {};
+  const fullName = metadata.full_name || [metadata.first_name, metadata.last_name].filter(Boolean).join(' ');
+  const { data: created, error: insertError } = await supabase.from('teacher_profiles').insert({
+    id: currentUser.id,
+    first_name: metadata.first_name || '',
+    last_name: metadata.last_name || '',
+    full_name: fullName
+  }).select().single();
   if (insertError) throw insertError;
   return created;
 }
@@ -40,6 +46,8 @@ $('#toggleAuth').addEventListener('click', () => {
   $('#authSubmit').textContent = isSignup ? 'Crear cuenta' : 'Ingresar';
   $('#toggleAuth').textContent = isSignup ? 'Ya tengo cuenta' : 'Crear cuenta';
   $('#nameWrap').classList.toggle('hidden', !isSignup);
+  $('#authForm').elements.first_name.required = isSignup;
+  $('#authForm').elements.last_name.required = isSignup;
   $('#authForm').elements.password.autocomplete = isSignup ? 'new-password' : 'current-password';
 });
 $('#authForm').addEventListener('submit', async (event) => {
@@ -47,8 +55,10 @@ $('#authForm').addEventListener('submit', async (event) => {
   const form = new FormData(event.currentTarget); const email = form.get('email'); const password = form.get('password');
   try {
     if (isSignup) {
-      const name = form.get('name')?.trim() || '';
-      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } });
+      const first_name = form.get('first_name')?.trim() || '';
+      const last_name = form.get('last_name')?.trim() || '';
+      const full_name = [first_name, last_name].filter(Boolean).join(' ');
+      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { first_name, last_name, full_name } } });
       if (error) throw error;
       if (data.session) await openApp(data.user);
       else setStatus('#authStatus', 'Cuenta creada. Revisá tu correo para confirmar el registro y luego ingresá.', 'ok');
@@ -106,6 +116,8 @@ async function loadSchedule() {
 }
 $('#profileForm').addEventListener('submit', async (event) => {
   event.preventDefault(); setStatus('#profileStatus', 'Guardando perfil…'); const data = Object.fromEntries(new FormData(event.currentTarget).entries());
+  data.first_name = data.first_name.trim(); data.last_name = data.last_name.trim();
+  data.full_name = [data.first_name, data.last_name].filter(Boolean).join(' ');
   const { error } = await supabase.from('teacher_profiles').upsert({ id: currentUser.id, ...data, updated_at: new Date().toISOString() });
   if (error) setStatus('#profileStatus', error.message, 'error'); else { if (data.primary_grade) $('#planForm').elements.grade.value = data.primary_grade; setStatus('#profileStatus', 'Perfil guardado.', 'ok'); }
 });
