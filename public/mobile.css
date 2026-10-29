@@ -1,0 +1,37 @@
+/* Calm, readable phone-first refinements; color always accompanies a label. */
+button,input,select,textarea{font:inherit}button{touch-action:manipulation}
+button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #3457c4;outline-offset:4px}
+.creation-steps{display:flex;gap:8px;list-style:none;padding:0;margin:20px 0;counter-reset:step}
+.creation-steps li{flex:1;min-width:0;background:#edf2ff;padding:12px 10px;border-radius:14px;color:#29478f;font-size:14px;font-weight:800}
+.creation-steps li:before{counter-increment:step;content:counter(step) ' · '}
+.device-access{margin:16px auto;padding:16px 20px;max-width:1124px;background:#edf2ff;border-radius:18px;color:#294078;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.device-access p{margin:0;flex:1 1 240px;font-size:15px}
+#offlinePanel[hidden]{display:none!important}
+#offlinePanel{position:fixed;inset:0;z-index:1000;background:#f5f7fb;overflow:auto;padding:24px 16px max(28px,env(safe-area-inset-bottom))}
+.offline-inner{max-width:720px;margin:auto}.offline-item{background:#fff;padding:20px;border:1px solid #dbe2f0;border-radius:18px;margin:14px 0;overflow-wrap:anywhere}
+.offline-item h3{margin:0;font-size:18px}.offline-item p{color:#53617b}.offline-item button{min-height:48px}
+@media(max-width:720px){
+ body{font-size:16px;line-height:1.55}main{padding-left:14px;padding-right:14px}
+ h1{font-size:26px}.muted,.form-note,#planResults,.plan-breadcrumb,.folder-heading .muted{font-size:14px;color:#53617b}
+ input,select,textarea,#planes input,#planes select{font-size:16px;min-height:52px;padding:13px 12px;max-width:100%;box-sizing:border-box}
+ label,.field-label,#planes .filter-row label{font-size:16px;color:#27364c}
+ button,.soft-btn,.primary,.blue,.dictate-button{min-height:48px;font-size:16px}
+ #planForm{grid-template-columns:minmax(0,1fr);gap:22px}#planForm>*{min-width:0}
+ .voice-control{display:flex;flex-direction:column;align-items:stretch;gap:8px}.voice-control textarea{min-height:115px;width:100%;font-size:17px;line-height:1.6}
+ .dictate-button{width:100%;justify-content:center;display:flex;gap:9px;align-items:center;background:#edf2ff;border:1px solid #bdccee;color:#29478f;border-radius:13px;padding:12px}
+ .dictate-button.listening{background:#ffefed;border-color:#c97069;color:#8a241c}
+ .section-hint{font-size:15px;line-height:1.6;padding:14px;border-radius:14px}
+ .form-actions{gap:12px}.form-actions button{width:100%;justify-content:center}
+ .creation-steps{gap:6px}.creation-steps li{font-size:13px;padding:10px 6px;text-align:center}
+ .nav .tab{min-height:58px}.nav .tab span{font-size:12px}
+ .subject-folder{min-height:160px;padding:17px}.subject-folder h2{font-size:17px}.subject-folder small,.subject-folder .folder-count{font-size:13px}
+ .timeline-day .plan-list-row h3{font-size:17px}.timeline-day .plan-list-row .muted,.timeline-date time{font-size:14px}
+ .folder-heading h2{font-size:17px}.folder-heading .soft-btn{font-size:15px;min-height:48px}
+ .plan-meta{grid-template-columns:minmax(0,1fr);gap:14px}.plan-paper{padding:20px 16px;font-size:16px;overflow-wrap:anywhere}
+ #planEditor{font-size:16px;line-height:1.65;min-height:240px}.plan-paper>.row button{width:100%}
+ .device-access{margin:14px;border-radius:18px;padding:16px}.device-access button{width:100%}
+ .head-actions .ghost{min-height:44px;font-size:14px}.checklist-table{font-size:14px}
+ #planes .filter-row{grid-template-columns:minmax(0,1fr)}#clearPlanFilters{font-size:15px;min-height:44px}
+ footer{padding-bottom:100px}
+}
+@media print{.device-access,.creation-steps,#offlinePanel{display:none!important}}

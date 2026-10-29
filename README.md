@@ -76,3 +76,12 @@ La función `generate-lesson-plan` llama a OpenAI desde Supabase; la clave del p
 Asignatura, modalidad, grado, fecha, contenido, indicador, observación opcional, rango de edad, recursos y preferencias pedagógicas se envían a OpenAI para generar la propuesta. El nombre y la escuela se agregan localmente después de recibir la respuesta y no se envían. El uso de OpenAI API puede generar cargos en la cuenta del proveedor según los tokens consumidos; establecé límites de uso y presupuesto en OpenAI antes de ofrecer la función a muchas personas.
 
 La migración de onboarding y calendario ya se aplicó al proyecto Supabase conectado. Para otra instancia, aplicá las migraciones en `supabase/migrations/` en orden.
+
+
+## PDF y consulta sin conexión
+
+El botón «Guardar PDF en mi teléfono» crea un PDF de texto paginado A4 con acentos españoles, sin dependencias externas. Guarda una copia en IndexedDB y descarga el archivo. La edición del plan se conserva en la exportación. «Imprimir» mantiene la plantilla estructurada de impresión. El PDF se guarda explícitamente; guardar en la cuenta sigue siendo una acción independiente.
+
+El service worker conserva la interfaz pública y el visor de copias locales; no almacena solicitudes de autenticación ni API. La sección «Mis PDF sin internet» funciona sin sesión y avisa que las copias son del dispositivo: no usar para documentos privados en teléfonos compartidos sin quitarlas después. No hay creación con IA sin conexión. Visitar el sitio una vez con conexión para preparar el acceso offline. Los datos del navegador pueden borrarse o ser desalojados: conservar las descargas.
+
+Dictado separado para contenido, indicador y observaciones, con revisión previa. Compatibilidad dependiente del navegador; alternativa con teclado. El asistente general queda fuera de este cambio.
