@@ -1,12 +1,16 @@
 # Syllabo
 
-Asistente de planificación docente con perfil, horario semanal y planes de clase por fecha.
+Asistente de planificación docente con ficha de bienvenida, perfil, agenda semanal, calendario escolar y biblioteca de planes.
 
 ## Funciones
 
 - Registro e inicio de sesión con correo y contraseña mediante Supabase Auth.
 - Recuperación de contraseña por correo.
-- Perfil individual del docente: nombre(s), apellido(s), centro educativo, municipio y grado principal.
+- Ficha inicial de docente: nombre, apellido, género para el trato y avatar, modalidad, grado y materias que imparte.
+- Encuesta breve del entorno docente, guardada en el perfil y disponible para personalizar propuestas.
+- Biblioteca de planes con búsqueda, filtros por asignatura y mes y orden por fecha, materia o tema.
+- Horario semanal como agenda por día y hora, con un botón para establecerlo y alertas de clases que necesitan planificación.
+- Calendario con vistas de mes, semana y día; reúne clases, planes y actividades, festivales y feriados creados por el docente. Los feriados registrados omiten las clases recurrentes y las alertas de planificación de esas fechas.
 - Horario de lunes a viernes, con varias clases por día.
 - Sugerencia de asignatura, grado y duración del horario al escoger fecha del plan.
 - Generación local de un borrador guiado sin enviar la información de la clase a un proveedor de IA.
@@ -16,7 +20,7 @@ Asistente de planificación docente con perfil, horario semanal y planes de clas
 
 ## Base de datos
 
-El esquema aplicado a Supabase está versionado en `supabase/migrations/`. Las tablas son `teacher_profiles`, `class_schedules` y `lesson_plans`; las tres tienen RLS habilitado y políticas por usuario.
+El esquema aplicado a Supabase está versionado en `supabase/migrations/`. Las tablas son `teacher_profiles`, `class_schedules`, `lesson_plans` y `calendar_events`; las tablas con datos de usuario tienen RLS y políticas por propietario. La migración `20261029044145_teacher_onboarding_calendar_events.sql` añade la información del onboarding y la agenda de eventos.
 
 ## Desarrollo local
 
@@ -43,4 +47,4 @@ El remitente puede seguir apareciendo como Supabase mientras se use el correo SM
 
 La app actualmente prepara el borrador dentro del navegador, sin mandar el contenido de las clases a un servicio externo. El endpoint de IA incluido en `supabase/functions/generate-lesson-plan/` todavía no está desplegado. Para activarlo primero hay que decidir qué proveedor se usará, autorizar el envío de los datos necesarios y definir el límite de gasto; una clave de OpenAI puede generar cargos y no se paga automáticamente con créditos de AWS.
 
-Para una instancia Supabase nueva, aplicá las migraciones en `supabase/migrations/`. No vuelvas a aplicar las migraciones si las tablas ya existen.
+La migración de onboarding y calendario ya se aplicó al proyecto Supabase conectado. Para otra instancia, aplicá las migraciones en `supabase/migrations/` en orden.
