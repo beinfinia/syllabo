@@ -173,7 +173,9 @@ function readProfileForm(form) {
   const selectedResources=window.SyllaboResources?.getSelected(form) || [];
   const customResources=window.SyllaboResources?.normalize(form.elements.other_resources?.value || '') || [];
   data.full_name = [data.first_name.trim(),data.last_name.trim()].filter(Boolean).join(' ');
-  data.teacher_context = Object.fromEntries(['student_age_range','context_zone','class_size','internet_access','planning_challenges','preferred_dynamics'].map(key=>[key,data[key] || '']));
+  data.teacher_context = { ...(currentProfile?.teacher_context || {}), ...Object.fromEntries(['student_age_range','context_zone','class_size','internet_access','planning_challenges','preferred_dynamics'].map(key=>[key,data[key] || ''])) };
+  data.teacher_context.avatar = ['woman','man','flower','owl','book'].includes(data.avatar_choice) ? data.avatar_choice : (data.teacher_context.avatar || (data.gender==='mujer'?'woman':'man'));
+  delete data.avatar_choice;
   data.teacher_context.available_resources=[...new Set([...selectedResources,...customResources])];
   delete data.other_resources; delete data.resource_choice;
   for (const key of Object.keys(data.teacher_context)) delete data[key];
@@ -184,6 +186,7 @@ function fillTeacherForm(form, profile) {
   populateGradeChoices(form,profile.modality || '',profile.primary_grade || '');
   populateSubjectChoices(form,profile.subjects || []);
   const context = profile.teacher_context || {};
+  if(form.elements.avatar_choice) form.elements.avatar_choice.value = context.avatar || (profile.gender==='mujer'?'woman':'man');
   for (const key of ['student_age_range','context_zone','class_size','internet_access','planning_challenges','preferred_dynamics']) if (form.elements[key]) form.elements[key].value = context[key] || '';
   const resources=window.SyllaboResources?.normalize(context.available_resources) || [];
   window.SyllaboResources?.populateChoices(form, resources.filter(value => window.SyllaboResources.catalog.includes(value)));
@@ -202,7 +205,12 @@ function updatePlanAgeHint(profile) {
   const range = profile?.teacher_context?.student_age_range || '';
   $('#planContextHint').textContent = `El plan usará ${grade}${range ? ` y adaptará ejemplos y dinámicas para estudiantes de ${range}` : ''}. Podés actualizar estos datos en Mi perfil.`;
 }
-function setTeacherIdentity(profile) { const avatar=$('#teacherAvatar'); const feminine=profile.gender==='mujer'; avatar.innerHTML=`<img class="avatar-image" src="./icons/avatar-${feminine?'woman':'man'}.svg" alt="">`; const name=[profile.first_name,profile.last_name].filter(Boolean).join(' '); avatar.setAttribute('aria-label',`Avatar de ${name||'docente'}`); avatar.title=name||'Docente'; }
+function setTeacherIdentity(profile) {
+  const avatar=$('#teacherAvatar'); const selected=profile.teacher_context?.avatar || (profile.gender==='mujer'?'woman':'man');
+  const symbols={flower:'🌻',owl:'🦉',book:'📚'};
+  avatar.innerHTML=symbols[selected]?`<span aria-hidden="true">${symbols[selected]}</span>`:`<img class="avatar-image" src="./icons/avatar-${selected==='woman'?'woman':'man'}.svg" alt="">`;
+  const name=[profile.first_name,profile.last_name].filter(Boolean).join(' ');avatar.setAttribute('aria-label',`Avatar de ${name||'docente'}`);avatar.title=name||'Docente';
+}
 async function saveTeacherProfile(form, onboarding = false) {
   const data = readProfileForm(form);
   if (!data.subjects.length) throw new Error('Seleccioná al menos una materia.');
@@ -657,27 +665,39 @@ function planFolders(plans) {
 }
 let activePlanFolder = '';
 function renderPlanList() {
-  const search=$('#planSearch').value.trim().toLocaleLowerCase(); const month=$('#planMonth').value;
-  const matches=plan=> (!month||String(plan.lesson_date||'').startsWith(month)) && (!search||`${plan.subject} ${plan.grade} ${plan.content||plan.topic}`.toLocaleLowerCase().includes(search));
+  const search=$('#planSearch').value.trim().toLocaleLowerCase(); const month=$('#planMonth').value; const exactDate=$('#planExactDate').value;
+  const matches=plan=> (!exactDate||plan.lesson_date===exactDate) && (!month||String(plan.lesson_date||'').startsWith(month)) && (!search||`${plan.subject} ${plan.grade} ${plan.content||plan.topic}`.toLocaleLowerCase().includes(search));
   const folders=planFolders(allPlans); const current=folders.find(folder=>folder.key===activePlanFolder);
   if(activePlanFolder&&!current)activePlanFolder='';
   $('#planFolderHeading').classList.toggle('hidden',!current);
   $('#plansList').classList.toggle('subject-folders',!current);
+  $('#plansList').classList.toggle('plan-timeline',!!current);
+  $('#planLocation').textContent=current?current.name:'Asignaturas';
   if(!current) {
     const palette=['#c8bbf4','#f4b8dc','#e8ef72','#ff936b','#afd0ed','#9dcbb7'];
     const visible=folders.filter(folder=>folder.plans.some(matches));
+    $('#planResults').textContent=`${visible.length} ${visible.length===1?'asignatura':'asignaturas'} · Elegí una carpeta para ver su línea de tiempo.`;
     $('#plansList').innerHTML=visible.length?visible.map((folder,index)=>`<button class="subject-folder" style="--folder-color:${palette[index%palette.length]}" data-folder="${escapeHtml(folder.key)}"><h2>${escapeHtml(folder.name)}</h2><span class="folder-symbol" aria-hidden="true">${['▤','✎','✳','◈','≋','✦'][index%6]}</span><span class="folder-count">${folder.plans.length} ${folder.plans.length===1?'plan':'planes'}</span><small>Último plan: ${escapeHtml(prettyDate(folder.plans[0].lesson_date))}</small></button>`).join(''):'<div class="empty">No hay planes para mostrar. Creá un plan o ajustá los filtros.</div>';
     $('#plansList').querySelectorAll('[data-folder]').forEach(button=>button.addEventListener('click',()=>{activePlanFolder=button.dataset.folder;renderPlanList();}));return;
   }
   $('#activeFolderName').textContent=current.name;
   const plans=current.plans.filter(matches);
   $('#activeFolderCount').textContent=`${plans.length} de ${current.plans.length} planes · Más recientes primero`;
-  $('#plansList').innerHTML=plans.length?plans.map(plan=>`<article class="plan-list-row"><div><h3>${escapeHtml(plan.content||plan.topic||'Plan de clase')}</h3><p class="muted">${escapeHtml(prettyDate(plan.lesson_date))} · ${escapeHtml(plan.grade)} · ${escapeHtml(plan.duration_minutes)} min</p></div><div class="row"><button class="soft-btn" data-open-plan="${plan.id}">Abrir / editar</button><button class="danger-btn" data-delete-plan="${plan.id}" aria-label="Eliminar plan ${escapeHtml(plan.topic)}">Eliminar</button></div></article>`).join(''):'<div class="empty">No hay planes con esos filtros en esta carpeta.</div>';
+  $('#planResults').textContent=`${plans.length} ${plans.length===1?'plan encontrado':'planes encontrados'}${exactDate?' para el '+prettyDate(exactDate):''}. Ordenados del más reciente al más antiguo.`;
+  const days=new Map(); for(const plan of plans){if(!days.has(plan.lesson_date))days.set(plan.lesson_date,[]);days.get(plan.lesson_date).push(plan);}
+  $('#plansList').innerHTML=plans.length?[...days].map(([date,dayPlans])=>{
+    const day=localDateFromKey(date);const weekday=day.toLocaleDateString('es-NI',{weekday:'long'});const monthYear=day.toLocaleDateString('es-NI',{month:'long',year:'numeric'});
+    return `<section class="timeline-day" aria-label="${escapeHtml(weekday+', '+prettyDate(date))}"><header class="timeline-date" style="position:static;box-shadow:none"><span class="timeline-date-number">${day.getDate()}</span><div><h2>${escapeHtml(weekday)}</h2><time datetime="${escapeHtml(date)}">${escapeHtml(monthYear)}</time></div><span class="pill">${date===localISODate()?'Hoy · ':''}${dayPlans.length} ${dayPlans.length===1?'plan':'planes'}</span></header>${dayPlans.map(plan=>`<article class="plan-list-row"><div><h3>${escapeHtml(plan.content||plan.topic||'Plan de clase')}</h3><p class="muted">${escapeHtml(plan.grade)} · ${escapeHtml(plan.duration_minutes)} minutos</p></div><div class="row"><button class="soft-btn" data-open-plan="${plan.id}">Abrir / editar</button><button class="danger-btn" data-delete-plan="${plan.id}" aria-label="Eliminar plan ${escapeHtml(plan.topic)}">Eliminar</button></div></article>`).join('')}</section>`;
+  }).join(''):'<div class="empty">No hay planes para esa fecha en esta carpeta. Probá otra fecha o pulsá «Limpiar búsqueda».</div>';
   plans.forEach(plan=>$(`[data-open-plan="${plan.id}"]`).addEventListener('click',()=>openSavedPlan(plan)));
   plans.forEach(plan=>$(`[data-delete-plan="${plan.id}"]`).addEventListener('click',()=>deletePlan(plan)));
 }
-$('#backToFolders').addEventListener('click',()=>{activePlanFolder='';renderPlanList();});
-$('#planSearch').addEventListener('input',renderPlanList); $('#planMonth').addEventListener('change',renderPlanList);
+function returnToPlanFolders(){activePlanFolder='';renderPlanList();}
+$('#backToFolders').addEventListener('click',returnToPlanFolders);
+$('#plansRoot').addEventListener('click',returnToPlanFolders);
+$('#planExactDate').addEventListener('change',()=>{if($('#planExactDate').value)$('#planMonth').value='';renderPlanList();});
+$('#clearPlanFilters').addEventListener('click',()=>{$('#planSearch').value='';$('#planMonth').value='';$('#planExactDate').value='';renderPlanList();});
+$('#planSearch').addEventListener('input',renderPlanList); $('#planMonth').addEventListener('change',()=>{$('#planExactDate').value='';renderPlanList();});
 async function openSavedPlan(plan) {
   currentPlanId = plan.id;
   const form = $('#planForm');
