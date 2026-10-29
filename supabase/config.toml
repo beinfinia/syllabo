@@ -1,0 +1,2 @@
+[functions.generate-lesson-plan]
+verify_jwt = true
