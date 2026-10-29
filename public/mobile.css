@@ -117,3 +117,18 @@ button,input,select,textarea{max-width:100%;box-sizing:border-box}
 }
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 @media print{body,#app .plan-paper,#app .plan-block p,#app .plan-meta{font-size:11pt!important;line-height:1.55}#app .checklist-table{font-size:10pt!important}}
+
+/* Matching circular illustrations and an explicit selection state. */
+.avatar-options{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+#app .avatar-option{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:164px;padding:19px 10px 29px;gap:12px;background:#fff;border:2px solid #e2e6f1;border-radius:22px;cursor:pointer;margin:0;transition:border-color .15s,background .15s}
+#app .avatar-option input{position:absolute;opacity:0;width:1px;height:1px;min-height:0;left:12px;top:12px;padding:0;margin:0}
+#app .avatar-option img{width:76px;height:76px;min-width:76px;border-radius:50%;box-shadow:0 3px 10px #29334d0c;object-fit:cover;background:transparent}
+#app .avatar-option>span{font-weight:900;font-size:14px;line-height:1.3;color:#34415d}
+#app .avatar-option:has(input:checked){padding:19px 10px 29px;border:2px solid #5675d6;background:#eff3ff;box-shadow:0 0 0 3px #e5ecff}
+#app .avatar-option:has(input:checked)::after{content:'✓ Elegido';position:absolute;bottom:8px;left:0;right:0;font-size:11px;font-weight:900;text-align:center;color:#3457c4}
+#app .avatar-option:has(input:focus-visible){outline:3px solid #3457c4;outline-offset:4px}
+#app .avatar-option:has(input:checked) img{box-shadow:0 0 0 3px #fff,0 0 0 5px #b2c0ed}
+#app .avatar{background:#fff;box-shadow:0 0 0 2px #fff,0 0 0 3px #d1cbe7}
+@media(max-width:720px){#app .avatar-options{grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}#app .avatar-option,#app .avatar-option:has(input:checked){min-height:142px;padding:16px 6px 27px;border-radius:19px;gap:10px}#app .avatar-option img{width:64px;height:64px;min-width:64px}#app .avatar-option>span{font-size:calc(var(--reading-size) - 3px)}}
+@media(max-width:380px){#app .avatar-options{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(prefers-reduced-motion:reduce){#app .avatar-option{transition:none}}

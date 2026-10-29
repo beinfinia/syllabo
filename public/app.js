@@ -225,8 +225,8 @@ $('#profileForm').addEventListener('change',event=>{
 function setTeacherIdentity(profile) {
   applyReadingPreference(profile.teacher_context?.reading_size);
   const avatar=$('#teacherAvatar'); const selected=profile.teacher_context?.avatar || (profile.gender==='mujer'?'woman':'man');
-  const symbols={flower:'🌻',owl:'🦉',book:'📚'};
-  avatar.innerHTML=symbols[selected]?`<span aria-hidden="true">${symbols[selected]}</span>`:`<img class="avatar-image" src="./icons/avatar-${selected==='woman'?'woman':'man'}.svg" alt="">`;
+  const choice=['woman','man','flower','owl','book'].includes(selected)?selected:'woman';
+  avatar.innerHTML=`<img class="avatar-image" src="./icons/avatar-${choice}.svg" alt="">`;
   const name=[profile.first_name,profile.last_name].filter(Boolean).join(' ');avatar.setAttribute('aria-label',`Avatar de ${name||'docente'}`);avatar.title=name||'Docente';
 }
 async function saveTeacherProfile(form, onboarding = false) {
