@@ -37,6 +37,7 @@ let generatedPlanData = null;
 let allPlans = [];
 
 let currentProfile = null;
+let planningGradeOverride = '';
 let openingUserId = null;
 let initializedUserId = null;
 let calendarDate = new Date();
@@ -89,7 +90,7 @@ async function openApp(user) {
   $('#userEmail').textContent = user.email || '';
   $('#auth').classList.add('hidden'); $('#app').classList.add('hidden');
   try {
-    const profile = await ensureProfile(); currentProfile = profile;
+    const profile = await ensureProfile(); currentProfile = profile; planningGradeOverride = profile.primary_grade || '';
     if (!profile.onboarding_completed) {
       $('#onboarding').classList.remove('hidden'); document.body.classList.add('onboarding-open');
       initializedUserId = user.id; openingUserId = null;
@@ -105,7 +106,6 @@ async function openApp(user) {
     setTeacherIdentity(profile);
     const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'docente';
     $('#welcomeTitle').textContent = `¡Hola, ${profile.gender === 'mujer' ? 'maestra' : 'maestro'} ${fullName}!`;
-    if (profile.primary_grade && !$('#planForm').elements.grade.value) $('#planForm').elements.grade.value = profile.primary_grade;
     populatePlanSubjectOptions(profile); updatePlanAgeHint(profile); populateScheduleGradeOptions(profile, profile.primary_grade);
     await loadHome();
     initializedUserId = user.id; openingUserId = null;
@@ -173,8 +173,7 @@ function populateGradeChoices(form, modality, selected = '') {
   const first = modality === 'secundaria' ? 7 : 1;
   const options = max ? Array.from({length:max-first+1},(_,i)=>`${first+i}° grado`) : [];
   field.innerHTML = '<option value="">Seleccioná un grado</option>' + options.map(value=>`<option value="${value}">${value}</option>`).join('') + '<option value="Multigrado">Multigrado</option>';
-  if (selected && !options.includes(selected) && selected !== 'Multigrado') field.insertAdjacentHTML('beforeend',`<option value="${escapeHtml(selected)}">${escapeHtml(selected)}</option>`);
-  field.value = selected || '';
+  field.value = options.includes(selected) || selected === 'Multigrado' ? selected : '';
   populateSubjectChoices(form);
 }
 function populateScheduleGradeOptions(profile = currentProfile, selected = '') {
@@ -186,8 +185,7 @@ function populateScheduleGradeOptions(profile = currentProfile, selected = '') {
   const options = last ? Array.from({length:last-first+1}, (_, index) => `${first+index}° grado`) : [];
   field.innerHTML = '<option value="">Elegí el grado</option>' + options.map(value => `<option value="${value}">${value}</option>`).join('') + '<option value="Multigrado">Multigrado</option>';
   const value = selected || profile?.primary_grade || '';
-  if (value && ![...options, 'Multigrado'].includes(value)) field.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`);
-  field.value = value;
+  field.value = [...options, 'Multigrado'].includes(value) ? value : '';
   populateScheduleSubjectSuggestions(profile, field.value);
 }
 function populateScheduleSubjectSuggestions(profile = currentProfile, grade = '') {
@@ -231,7 +229,11 @@ function populatePlanSubjectOptions(profile, selected = '') {
   select.value=value||'';
 }
 function setPlanSubject(value) { const select=$('#planSubjectInput'); if(![...select.options].some(option=>option.value===value))select.insertAdjacentHTML('beforeend',`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`);select.value=value; }
-function updatePlanAgeHint(profile) { const range=profile?.teacher_context?.student_age_range||'';$('#planAgeHint').textContent=range?`Adaptaremos los ejemplos y dinámicas para estudiantes de ${range}. Podés cambiar este rango en Mi perfil.`:'Indicá el rango de edad en tu perfil para adecuar las propuestas.'; }
+function updatePlanAgeHint(profile) {
+  const grade = planningGradeOverride || profile?.primary_grade || 'grado de tu perfil';
+  const range = profile?.teacher_context?.student_age_range || '';
+  $('#planContextHint').textContent = `El plan usará ${grade}${range ? ` y adaptará ejemplos y dinámicas para estudiantes de ${range}` : ''}. Podés actualizar estos datos en Mi perfil.`;
+}
 function setTeacherIdentity(profile) { $('#teacherAvatar').textContent = profile.gender === 'varon' ? '👨‍🏫' : '👩‍🏫'; }
 async function saveTeacherProfile(form, onboarding = false) {
   const data = readProfileForm(form);
@@ -241,7 +243,7 @@ async function saveTeacherProfile(form, onboarding = false) {
   if (error) throw error;
   currentProfile = saved; fillTeacherForm($('#profileForm'),saved); setTeacherIdentity(saved);
   $('#welcomeTitle').textContent = `¡Hola, ${saved.gender === 'mujer' ? 'maestra' : 'maestro'} ${[saved.first_name, saved.last_name].filter(Boolean).join(' ')}!`;
-  if (saved.primary_grade) $('#planForm').elements.grade.value = saved.primary_grade;
+  planningGradeOverride = saved.primary_grade || '';
   populatePlanSubjectOptions(saved); updatePlanAgeHint(saved); populateScheduleGradeOptions(saved, saved.primary_grade);
   if (onboarding) { $('#onboarding').classList.add('hidden'); document.body.classList.remove('onboarding-open'); $('#app').classList.remove('hidden'); await loadHome(); }
   return saved;
@@ -376,12 +378,20 @@ function plainPlanText(plan) {
   lines.push('', 'Borrador para revisión docente. Adecuar al programa de estudio y a las características del grupo.');
   return lines.join('\n');
 }
+function suggestEvaluationCriteria(data) {
+  return [
+    `Demuestra el aprendizaje esperado descrito en el indicador: ${data.achievement_indicator}`,
+    `Relaciona el contenido «${data.content}» con la actividad o el ejemplo trabajado.`,
+    `Explica o presenta su respuesta con claridad y utiliza ideas vinculadas con «${data.topic}».`
+  ].join('\n');
+}
 function localDraft(data, teacher) {
   const total = Number(data.duration_minutes);
   const opener = Math.max(2, Math.round(total * .2));
   const close = Math.max(2, Math.round(total * .2));
   const develop = total - opener - close;
   const subject = data.subject.toLowerCase();
+  const evaluationCriteria = data.evaluation_criteria || suggestEvaluationCriteria(data);
   const ageRange=teacher.teacher_context?.student_age_range||'';
   let ageGuidance='';
   if(ageRange==='3–5 años')ageGuidance='Usar objetos concretos, imágenes, consignas de un paso y juegos breves con movimiento.';
@@ -408,15 +418,15 @@ function localDraft(data, teacher) {
   const plan = {
     title: data.topic, teacher: [teacher.first_name, teacher.last_name].filter(Boolean).join(' '), school: teacher.school_name, student_age_range:ageRange,
     subject: data.subject, grade: data.grade, lesson_date: data.lesson_date, duration_minutes: total, topic: data.topic,
-    content: data.content, achievement_indicator: data.achievement_indicator, evaluation_criteria: data.evaluation_criteria,
+    content: data.content, achievement_indicator: data.achievement_indicator, evaluation_criteria: evaluationCriteria,
     resources: data.resources || teacher.teacher_context?.available_resources || 'Pizarra, cuaderno, lápiz y material visual disponible.',
     objective: `Que las y los estudiantes comprendan y trabajen ${data.content}, demostrando avances hacia este indicador: ${data.achievement_indicator}`,
     activities: [
       { moment:'Primer momento · Iniciación', minutes:opener, activity:`Dar la bienvenida y presentar el tema «${data.topic}». Activar saberes previos con preguntas: ¿qué sabemos?, ¿dónde lo hemos visto?, ¿qué queremos descubrir? Registrar algunas ideas y acordar el propósito de la clase.`, examples:example, assessment:'Escuchar las respuestas iniciales, valorar ideas previas y aclarar vocabulario que se necesite.' },
-      { moment:'Segundo momento · Desarrollo', minutes:develop, activity:`Presentar brevemente el contenido «${data.content}» usando ejemplos y apoyos visuales. Modelar cómo se resuelve o comprende una situación vinculada con el indicador. ${activity} ${ageGuidance}`, examples:example, assessment:`Observar el trabajo individual y en parejas. Hacer preguntas de seguimiento y brindar una pista o ejemplo adicional a quienes lo necesiten. Criterios a observar: ${data.evaluation_criteria || 'comprende el contenido, participa y explica sus respuestas.'}` },
+      { moment:'Segundo momento · Desarrollo', minutes:develop, activity:`Presentar brevemente el contenido «${data.content}» usando ejemplos y apoyos visuales. Modelar cómo se resuelve o comprende una situación vinculada con el indicador. ${activity} ${ageGuidance}`, examples:example, assessment:`Observar el trabajo individual y en parejas. Hacer preguntas de seguimiento y brindar una pista o ejemplo adicional a quienes lo necesiten. Criterios a observar: ${evaluationCriteria}` },
       { moment:'Tercer momento · Culminación', minutes:close, activity:`Invitar a algunos estudiantes a compartir su respuesta o producción. Cerrar con una síntesis colectiva: cada estudiante completa oralmente o por escrito «Hoy aprendí…» y «Todavía quiero practicar…».`, examples:'Aplicar una pregunta o ejercicio corto directamente relacionado con el indicador de logro.', assessment:`Recoger una respuesta breve de cada estudiante y verificarla con el indicador: ${data.achievement_indicator}` }
     ],
-    evidence:`Producción o respuesta individual relacionada con «${data.content}», explicación oral del procedimiento y participación en la actividad. Revisar con estos criterios: ${data.evaluation_criteria || 'comprensión, participación y explicación de la respuesta.'}`,
+    evidence:`Producción o respuesta individual relacionada con «${data.content}», explicación oral del procedimiento y participación en la actividad. Revisar con estos criterios: ${evaluationCriteria}`,
     differentiation:`Presentar instrucciones cortas en pasos; mostrar un ejemplo resuelto; apoyar con imágenes u objetos; permitir trabajar con una pareja de apoyo; ofrecer una consigna de ampliación a quien termine antes.${teacher.teacher_context?.internet_access==='Sin acceso en el aula'?' Priorizar materiales impresos, objetos del entorno y actividades que no requieran conexión.':''}${teacher.teacher_context?.planning_challenges?` Considerar el desafío que señaló el docente: ${teacher.teacher_context.planning_challenges}`:''}`,
     homework:''
   };
@@ -426,31 +436,60 @@ function localDraft(data, teacher) {
 function getPlanFormData() {
   const data = Object.fromEntries(new FormData($('#planForm')).entries());
   data.duration_minutes = Number(data.duration_minutes);
+  data.grade = planningGradeOverride || currentProfile?.primary_grade || '';
+  data.evaluation_criteria = suggestEvaluationCriteria(data);
   return data;
 }
 function formHasRequiredData(data) {
   for (const key of ['subject','grade','topic','lesson_date','content','achievement_indicator']) {
-    if (!String(data[key] || '').trim()) { $('#planForm').elements[key].focus(); return false; }
+    if (!String(data[key] || '').trim()) { $('#planForm').elements[key]?.focus(); return false; }
   }
   if (data.duration_minutes < 10 || data.duration_minutes > 600) { $('#planForm').elements.duration_minutes.focus(); return false; }
   return true;
 }
-$('#planForm').addEventListener('submit', async event => {
-  event.preventDefault(); const data = getPlanFormData();
-  if (!formHasRequiredData(data)) { setStatus('#planStatus', 'Completá los campos requeridos para preparar el plan.', 'error'); return; }
+let pendingPlanData = null;
+function reviewPlan(event) {
+  event.preventDefault();
+  const data = getPlanFormData();
+  if (!data.grade) { setStatus('#planStatus', 'Elegí el grado en Mi perfil antes de preparar el plan.', 'error'); return; }
+  if (!formHasRequiredData(data)) { setStatus('#planStatus', 'Completá la asignatura, el tema, la fecha, el contenido y el indicador.', 'error'); return; }
+  pendingPlanData = data;
+  const profile = currentProfile || {};
+  const summary = [
+    ['Asignatura', data.subject], ['Modalidad', profile.modality || '—'], ['Grado del perfil', data.grade],
+    ['Edad del grupo', profile.teacher_context?.student_age_range || 'No indicada'],
+    ['Tema', data.topic], ['Fecha', prettyDate(data.lesson_date)], ['Duración', `${data.duration_minutes} minutos`],
+    ['Contenido', data.content], ['Indicador de logro', data.achievement_indicator],
+    ['Recursos', data.resources || profile.teacher_context?.available_resources || 'Materiales escolares básicos'],
+    ['Criterios de evaluación', 'Se propondrán automáticamente dentro del borrador.']
+  ];
+  $('#planReviewDetails').innerHTML = summary.map(([label, value]) => `<div><b>${escapeHtml(label)}:</b> ${escapeHtml(value)}</div>`).join('');
+  $('#planForm').classList.add('hidden');
+  $('#planReview').classList.remove('hidden');
+  setStatus('#planStatus');
+  $('#planReview').scrollIntoView({ behavior:'smooth', block:'center' });
+}
+$('#planForm').addEventListener('submit', reviewPlan);
+$('#editPlanDetails').addEventListener('click', () => { $('#planReview').classList.add('hidden'); $('#planForm').classList.remove('hidden'); });
+$('#generatePlan').addEventListener('click', async () => {
+  if (!pendingPlanData) return;
   const button = $('#generatePlan'); button.disabled = true;
   $('#aiState').innerHTML = '<span class="progress"><span></span></span> Preparando el borrador en este dispositivo…';
   setStatus('#planStatus', 'Armando la secuencia de clase…');
   try {
     const teacher = await ensureProfile();
+    const data = { ...pendingPlanData, grade:planningGradeOverride || teacher.primary_grade || '' };
+    if (!data.grade) throw new Error('Seleccioná el grado en Mi perfil para continuar.');
+    data.evaluation_criteria = suggestEvaluationCriteria(data);
     const result = { plan:localDraft(data, teacher), source:'guided' };
     generatedPlanText = result.plan.text;
     generatedPlanData = result.plan;
+    $('#planReview').classList.add('hidden'); $('#planForm').classList.remove('hidden');
     renderPlanPreview(result.plan, result.source);
-    $('#aiState').textContent = 'Borrador guiado en este dispositivo. El contenido no se envió a un servicio externo.';
-    setStatus('#planStatus', 'Tu borrador está listo. Revisá las actividades antes de guardarlo.', 'ok');
+    $('#aiState').textContent = 'Criterios y actividades propuestos automáticamente en este dispositivo; el contenido no se envió a un servicio externo.';
+    setStatus('#planStatus', 'El borrador está listo. Revisá y ajustá la propuesta antes de guardarla.', 'ok');
     currentPlanId = null;
-  } catch (err) { setStatus('#planStatus', friendlyError(err), 'error'); $('#aiState').textContent = 'No se pudo generar la propuesta.'; }
+  } catch (err) { setStatus('#planStatus', friendlyError(err), 'error'); $('#aiState').textContent = 'No se pudo generar la propuesta.'; $('#planReview').classList.remove('hidden'); $('#planForm').classList.add('hidden'); }
   finally { button.disabled = false; }
 });
 function renderPlanPreview(plan, source = 'guided') {
@@ -465,6 +504,7 @@ function renderPlanPreview(plan, source = 'guided') {
 }
 async function saveCurrentPlan() {
   const data = getPlanFormData();
+  data.evaluation_criteria = generatedPlanData?.evaluation_criteria || suggestEvaluationCriteria(data);
   const editor = $('#planEditor');
   if (editor) generatedPlanText = editor.value;
   const row = { ...data, plan_body:{ text:generatedPlanText, plan:generatedPlanData, source:$('#aiState').textContent.startsWith('Borrador guiado') ? 'guided' : 'ai' }, updated_at:new Date().toISOString() };
@@ -480,11 +520,17 @@ async function saveCurrentPlan() {
   } catch(error) { setStatus('#saveStatus', friendlyError(error), 'error'); }
   finally { $('#savePlan').disabled = false; }
 }
-$('#newPlan').addEventListener('click', () => {
-  const grade = $('#profileForm').elements.primary_grade.value || '';
-  $('#planForm').reset(); $('#planForm').elements.lesson_date.value = localISODate(); $('#planForm').elements.duration_minutes.value = 45; $('#planForm').elements.grade.value = grade;
-  $('#planPreview').innerHTML = ''; $('#aiState').textContent = 'Se prepara un borrador editable.'; setStatus('#planStatus'); currentPlanId = null; generatedPlanText = ''; generatedPlanData = null;
-});
+function startPlanFromClass({ date = localISODate(), subject = '', grade = '', duration = 45 } = {}) {
+  const form = $('#planForm');
+  form.reset(); form.elements.lesson_date.value = date; form.elements.duration_minutes.value = duration;
+  planningGradeOverride = grade || currentProfile?.primary_grade || '';
+  if (subject) setPlanSubject(subject);
+  updatePlanAgeHint(currentProfile);
+  form.classList.remove('hidden'); $('#planReview').classList.add('hidden');
+  $('#planPreview').innerHTML = ''; $('#aiState').textContent = 'Se prepara un borrador editable.'; setStatus('#planStatus');
+  currentPlanId = null; generatedPlanText = ''; generatedPlanData = null; pendingPlanData = null;
+}
+$('#newPlan').addEventListener('click', () => startPlanFromClass());
 
 async function loadPlans() {
   $('#plansList').innerHTML = '<div class="empty">Cargando tus planes…</div>';
@@ -514,8 +560,11 @@ $('#planSearch').addEventListener('input', renderPlanList); $('#planMonth').addE
 async function openSavedPlan(plan) {
   currentPlanId = plan.id;
   const form = $('#planForm');
+  planningGradeOverride = plan.grade || currentProfile?.primary_grade || '';
+  updatePlanAgeHint(currentProfile);
   setPlanSubject(plan.subject);
-  for (const key of ['subject','grade','topic','lesson_date','content','achievement_indicator','evaluation_criteria','duration_minutes','resources']) form.elements[key].value = plan[key] ?? '';
+  for (const key of ['subject','topic','lesson_date','content','achievement_indicator','duration_minutes','resources']) form.elements[key].value = plan[key] ?? '';
+  form.classList.remove('hidden'); $('#planReview').classList.add('hidden');
   const profile = await ensureProfile();
   const body = plan.plan_body || {};
   const draft = body.plan || null;
@@ -646,7 +695,7 @@ function bindCalendarEntries() {
   $('#calendarBoard').querySelectorAll('[data-edit-event]').forEach(button=>button.addEventListener('click',()=>{const event=allCalendarEvents.find(item=>item.id===button.dataset.editEvent);if(event)openCalendarEventForm(event);}));
   $('#calendarBoard').querySelectorAll('[data-delete-event]').forEach(button=>button.addEventListener('click',async()=>{const event=allCalendarEvents.find(item=>item.id===button.dataset.deleteEvent);if(!event||!confirm(`¿Eliminar “${event.title}” del calendario?`))return;const {error}=await supabase.from('calendar_events').delete().eq('id',event.id);if(error)alert(friendlyError(error));else loadCalendar();}));
   $('#calendarBoard').querySelectorAll('[data-calendar-plan]').forEach(button=>button.addEventListener('click',()=>{const plan=allCalendarPlans.find(item=>item.id===button.dataset.calendarPlan);if(plan)openSavedPlan(plan);}));
-  $('#calendarBoard').querySelectorAll('[data-calendar-class]').forEach(button=>button.addEventListener('click',()=>{const form=$('#planForm');form.reset();form.elements.lesson_date.value=button.dataset.calendarClass;setPlanSubject(button.dataset.subject);form.elements.grade.value=button.dataset.grade;form.elements.duration_minutes.value=button.dataset.duration;$('#planPreview').innerHTML='';currentPlanId=null;showPage('crear');}));
+  $('#calendarBoard').querySelectorAll('[data-calendar-class]').forEach(button=>button.addEventListener('click',()=>{startPlanFromClass({date:button.dataset.calendarClass,subject:button.dataset.subject,grade:button.dataset.grade,duration:Number(button.dataset.duration)});showPage('crear');}));
 }
 
 $('#profileForm').addEventListener('submit', async event => {
@@ -683,7 +732,7 @@ async function loadHome() {
   for(const {date,item} of classDates){const key=dateKey(date);if(!plans.some(plan=>samePlan(plan,key,item.subject,item.grade)))upcoming.push({date,key,item});}
   const alerts=upcoming.slice(0,5);
   $('#planningAlerts').innerHTML=alerts.length?alerts.map(({date,key,item})=>`<article class="item"><div class="row"><span class="pill">Por planear</span><b>${escapeHtml(date.toLocaleDateString('es-NI',{weekday:'short',day:'numeric',month:'short'}))}</b><span>${escapeHtml(item.subject)} · ${escapeHtml(item.grade)}</span><button class="blue" data-plan-class="${escapeHtml(key)}" data-subject="${escapeHtml(item.subject)}" data-grade="${escapeHtml(item.grade)}" data-duration="${item.duration_minutes}">Crear plan</button></div></article>`).join(''):'<div class="empty">¡Bien! Las próximas clases ya tienen un plan guardado.</div>';
-  $('#planningAlerts').querySelectorAll('[data-plan-class]').forEach(button=>button.addEventListener('click',()=>{const form=$('#planForm');form.reset();form.elements.lesson_date.value=button.dataset.planClass;setPlanSubject(button.dataset.subject);form.elements.grade.value=button.dataset.grade;form.elements.duration_minutes.value=button.dataset.duration;$('#planPreview').innerHTML='';currentPlanId=null;showPage('crear');}));
+  $('#planningAlerts').querySelectorAll('[data-plan-class]').forEach(button=>button.addEventListener('click',()=>{startPlanFromClass({date:button.dataset.planClass,subject:button.dataset.subject,grade:button.dataset.grade,duration:Number(button.dataset.duration)});showPage('crear');}));
 }
 
 function showRecoveryForm() {
@@ -700,9 +749,13 @@ $('#planForm').elements.lesson_date.addEventListener('change', async event => {
   if (weekday < 1 || weekday > 5) return;
   const { data } = await supabase.from('class_schedules').select('subject,grade,duration_minutes').eq('weekday',weekday).order('start_time');
   if (!data?.length) return;
-  const selected = data[0]; const form = $('#planForm');
-  if (!form.elements.subject.value) setPlanSubject(selected.subject);
-  if (!form.elements.grade.value) form.elements.grade.value = selected.grade;
+  const form = $('#planForm');
+  const selected = data.find(item => item.subject === form.elements.subject.value) || data[0];
+  if (!form.elements.subject.value) {
+    setPlanSubject(selected.subject);
+  }
+  planningGradeOverride = selected.grade || currentProfile?.primary_grade || '';
+  updatePlanAgeHint(currentProfile);
   if (!form.elements.duration_minutes.value || form.elements.duration_minutes.value === '45') form.elements.duration_minutes.value = selected.duration_minutes;
 });
 window.syllaboAppReady = true;
