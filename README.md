@@ -18,7 +18,7 @@ Sirve la carpeta `public/` como sitio estático. `index.html` carga Supabase JS 
 Conecta este repositorio de GitHub a Cloudflare Pages y configura:
 
 - Framework preset: `None`
-- Build command: dejar vacío
+- Build command: `exit 0`
 - Build output directory: `public`
 - Root directory: dejar vacío (raíz del repositorio)
 
