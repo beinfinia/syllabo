@@ -98,6 +98,14 @@ let savedAuthMode = 'login';
 try { savedAuthMode = sessionStorage.getItem('syllabo_auth_mode') || 'login'; } catch {}
 setAuthMode(savedAuthMode === 'signup');
 $('#toggleAuth').addEventListener('click', () => { setStatus('#authStatus'); setAuthMode(!isSignup); });
+document.querySelectorAll('[data-password-toggle]').forEach(button => button.addEventListener('click', () => {
+  const input = document.getElementById(button.dataset.passwordToggle);
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  button.textContent = show ? 'Ocultar' : 'Mostrar';
+  button.setAttribute('aria-pressed', String(show));
+  button.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
+}));
 $('#authForm').elements.email.addEventListener('input', () => {
   const showResend = Boolean(pendingSignupEmail || (!isSignup && $('#authForm').elements.email.value.trim()));
   $('#resendVerification').classList.toggle('hidden', !showResend);
@@ -121,6 +129,7 @@ $('#authForm').addEventListener('submit', async event => {
     } else {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      recoveringPassword = false;
       setAuthMode(false); if (data.user) await openApp(data.user);
     }
   } catch (err) { setStatus('#authStatus', friendlyError(err), 'error'); }
@@ -368,16 +377,19 @@ async function loadHome() {
   $('#homeSchedule').innerHTML = orderedDays.slice(0,5).map(item=>`<article class="item"><div class="row"><span class="pill">${weekdays[item.weekday]}</span><b>${escapeHtml((item.start_time||'').slice(0,5))}</b><span>${escapeHtml(item.subject)} · ${escapeHtml(item.grade)}${item.section?` · ${escapeHtml(item.section)}`:''}</span><span class="muted">${escapeHtml(item.duration_minutes)} min</span></div></article>`).join('');
 }
 
-const { data:{ session } } = await supabase.auth.getSession();
-if (session?.user) await openApp(session.user);
+let recoveringPassword = false;
 supabase.auth.onAuthStateChange((event, session) => {
-  if (session?.user && $('#app').classList.contains('hidden')) openApp(session.user);
   if (event === 'PASSWORD_RECOVERY') {
+    recoveringPassword = true;
     $('#auth').classList.remove('hidden'); $('#app').classList.add('hidden');
     $('#authForm').classList.add('hidden'); $('#recoveryForm').classList.remove('hidden'); $('#recoveryForm').elements.password.focus();
     setStatus('#authStatus','Elegí una contraseña nueva de al menos 8 caracteres.');
+    return;
   }
+  if (session?.user && !recoveringPassword && $('#app').classList.contains('hidden')) openApp(session.user);
 });
+const { data:{ session } } = await supabase.auth.getSession();
+if (session?.user && !recoveringPassword && $('#app').classList.contains('hidden')) await openApp(session.user);
 $('#planForm').elements.lesson_date.value = localISODate();
 $('#planForm').elements.lesson_date.addEventListener('change', async event => {
   if (!currentUser || !event.target.value) return;
