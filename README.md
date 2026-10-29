@@ -1,9 +1,17 @@
 # Syllabo
 Tu asistente de planificación docente.
 
-Aplicación web inicial. Supabase ya tiene el esquema dedicado para perfiles docentes, horarios y planes, con Row Level Security activado para que cada persona solo acceda a sus registros.
+## Incluye
+- Registro e inicio de sesión con Supabase Auth.
+- Perfil docente: nombre, escuela, municipio y grado principal.
+- Horario semanal almacenado en Supabase.
+- Planes por fecha, guardados en Supabase e imprimibles como PDF.
+- RLS para que cada cuenta solo pueda leer y modificar sus propios registros.
 
-## Configuración del cliente
-Configura en el despliegue `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` a partir del proyecto Syllabo. Nunca expongas la clave `service_role` ni claves secretas en el navegador.
+## Base de datos
+El esquema está en `supabase/migrations/202610290001_syllabo_schema.sql` y ya se aplicó al proyecto Supabase Syllabo. Las tablas son `teacher_profiles`, `class_schedules` y `lesson_plans`.
 
-La interfaz actual sigue siendo un prototipo local. La autenticación y sincronización con Supabase deben conectarse antes de usarlo con varias docentes. La clave de OpenAI debe residir en un servicio de servidor, como una Supabase Edge Function.
+## Ejecutar
+Sirve la carpeta `public/` como sitio estático. `index.html` carga Supabase JS v2 desde esm.sh. La URL del proyecto y su publishable key están en `public/app.js`; la publishable key puede usarse en frontend con RLS activo. Nunca pongas una secret/service_role key ni la clave de OpenAI en el código del navegador.
+
+La generación automática de planes con IA todavía no está conectada. Los planes actuales son borradores de estructura que la docente debe revisar y completar.
