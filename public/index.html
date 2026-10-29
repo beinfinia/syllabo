@@ -138,6 +138,34 @@ input:focus,select:focus,textarea:focus{background:#fff;border-color:#7391e7;box
 @media(max-width:360px){main{padding-left:11px;padding-right:11px}.card{padding:17px 13px}.subject-folder{padding:14px 11px;min-height:196px}.subject-folder h2{font-size:14px}.timeline-date .pill{font-size:8px;padding:4px 5px}.tab{font-size:9px}.timeline-date h2{font-size:15px}}
 
 .subject-folder:nth-child(6n+1){background:#ddd9fa}.subject-folder:nth-child(6n+2){background:#f8dce9}.subject-folder:nth-child(6n+3){background:#e7edbd}.subject-folder:nth-child(6n+4){background:#f9dfcd}.subject-folder:nth-child(6n+5){background:#d9e8fa}.subject-folder:nth-child(6n){background:#d5eadd}
+
+/* Section colors are paired with labels, icons and an active marker. */
+.tab[data-page="inicio"]{--section:#315fbd;--section-bg:#e7efff}
+.tab[data-page="crear"]{--section:#276c47;--section-bg:#e3f4e7}
+.tab[data-page="planes"]{--section:#7345b5;--section-bg:#efe6fc}
+.tab[data-page="calendario"]{--section:#9c510d;--section-bg:#fff0d9}
+.tab[data-page="perfil"]{--section:#a13f75;--section-bg:#fbe6f1}
+.nav .tab{color:var(--section);border:1px solid transparent}
+.nav .tab.active{color:var(--section);background:var(--section-bg);border-color:var(--section)}
+.page#inicio{--page-accent:#315fbd}.page#crear{--page-accent:#276c47}.page#planes{--page-accent:#7345b5}.page#calendario{--page-accent:#9c510d}.page#perfil{--page-accent:#a13f75}
+.page>.card:first-child{border-top:4px solid var(--page-accent)}
+.page>.card:first-child>.eyebrow{color:var(--page-accent)}
+@media screen and (max-width:720px){
+ #app .nav{position:fixed!important;top:auto!important;bottom:0!important;left:0!important;right:0!important;z-index:50;display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;overflow:visible;background:#fff;border-top:1px solid #dce3ef;padding:8px 8px calc(8px + env(safe-area-inset-bottom));margin:0;box-shadow:0 -4px 20px #2637460c;backdrop-filter:none}
+ #app>header{backdrop-filter:none;transform:none;filter:none}
+ #app .nav .tab{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:62px;padding:7px 2px 10px;border-radius:15px;background:var(--section-bg);color:var(--section);border:2px solid transparent;font-size:10px;line-height:1.2;font-weight:900}
+ #app .nav .tab .icon{width:23px;height:23px;filter:none;opacity:1}
+ #app .nav .tab[data-page="inicio"] .icon{filter:invert(32%) sepia(60%) saturate(1300%) hue-rotate(190deg)}
+ #app .nav .tab[data-page="crear"] .icon{filter:invert(35%) sepia(25%) saturate(1000%) hue-rotate(90deg)}
+ #app .nav .tab[data-page="planes"] .icon{filter:invert(33%) sepia(45%) saturate(1500%) hue-rotate(230deg)}
+ #app .nav .tab[data-page="calendario"] .icon{filter:invert(35%) sepia(70%) saturate(1300%) hue-rotate(5deg)}
+ #app .nav .tab[data-page="perfil"] .icon{filter:invert(36%) sepia(35%) saturate(1200%) hue-rotate(285deg)}
+ #app .nav .tab.active{border-color:var(--section);box-shadow:0 2px 6px #2637460b}
+ #app .nav .tab.active::after{content:'';position:absolute;bottom:4px;width:18px;height:3px;background:var(--section);border-radius:3px}
+ #app main{padding-bottom:calc(120px + env(safe-area-inset-bottom))!important}
+ #app footer{padding-bottom:calc(120px + env(safe-area-inset-bottom))}
+}
+@media print{#app .nav{display:none!important}}
 </style>
 <link rel="manifest" href="./manifest.webmanifest"><link rel="stylesheet" href="./mobile.css"></head>
 <body>
