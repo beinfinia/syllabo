@@ -172,7 +172,7 @@ function populateGradeChoices(form, modality, selected = '') {
   const max = modality === 'primaria' ? 6 : modality === 'secundaria' ? 11 : 0;
   const first = modality === 'secundaria' ? 7 : 1;
   const options = max ? Array.from({length:max-first+1},(_,i)=>`${first+i}° grado`) : [];
-  field.innerHTML = '<option value="">Seleccioná un grado</option>' + options.map(value=>`<option value="${value}">${value}</option>`).join('') + '<option value="Multigrado">Multigrado</option>';
+  field.innerHTML = '<option value="">' + (modality ? 'Seleccioná un grado' : 'Seleccioná primero la modalidad') + '</option>' + options.map(value=>`<option value="${value}">${value}</option>`).join('') + (modality ? '<option value="Multigrado">Multigrado</option>' : '');
   field.value = options.includes(selected) || selected === 'Multigrado' ? selected : '';
   populateSubjectChoices(form);
 }
