@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 
 const SUPABASE_URL = 'https://rrptfgdshlrfongkfppv.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_VIbLFUuvaksiYulO8-CuCQ_zRY92zUp';
-const PRODUCTION_APP_URL = 'https://syllabo-7hj.pages.dev/';
+const PRODUCTION_APP_URL = 'https://syllabo.beinfinia.com/';
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
@@ -18,6 +18,7 @@ let currentPlanId = null;
 let generatedPlanText = '';
 let generatedPlanData = null;
 let allPlans = [];
+let pendingSignupEmail = '';
 
 function setStatus(selector, message = '', type = '') {
   const el = $(selector); if (!el) return;
@@ -89,12 +90,18 @@ function setAuthMode(signup) {
   $('#authForm').elements.first_name.required = isSignup;
   $('#authForm').elements.last_name.required = isSignup;
   $('#authForm').elements.password.autocomplete = isSignup ? 'new-password' : 'current-password';
+  const emailEntered = Boolean($('#authForm').elements.email.value.trim());
+  $('#resendVerification').classList.toggle('hidden', !pendingSignupEmail && (isSignup || !emailEntered));
   try { sessionStorage.setItem('syllabo_auth_mode', isSignup ? 'signup' : 'login'); } catch {}
 }
 let savedAuthMode = 'login';
 try { savedAuthMode = sessionStorage.getItem('syllabo_auth_mode') || 'login'; } catch {}
 setAuthMode(savedAuthMode === 'signup');
 $('#toggleAuth').addEventListener('click', () => { setStatus('#authStatus'); setAuthMode(!isSignup); });
+$('#authForm').elements.email.addEventListener('input', () => {
+  const showResend = Boolean(pendingSignupEmail || (!isSignup && $('#authForm').elements.email.value.trim()));
+  $('#resendVerification').classList.toggle('hidden', !showResend);
+});
 $('#authForm').addEventListener('submit', async event => {
   event.preventDefault(); setStatus('#authStatus', isSignup ? 'Creando tu cuenta…' : 'Ingresando…');
   const form = new FormData(event.currentTarget); const email = String(form.get('email') || '').trim(); const password = String(form.get('password') || '');
@@ -106,13 +113,25 @@ $('#authForm').addEventListener('submit', async event => {
       const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { first_name, last_name, full_name }, emailRedirectTo: authRedirectTo() } });
       if (error) throw error;
       if (data.session && data.user) await openApp(data.user);
-      else setStatus('#authStatus', 'Cuenta creada. Revisá tu correo y confirmá el registro antes de ingresar.', 'ok');
+      else {
+        pendingSignupEmail = email;
+        $('#resendVerification').classList.remove('hidden');
+        setStatus('#authStatus', 'Cuenta creada. Revisá tu correo y confirmá el registro antes de ingresar.', 'ok');
+      }
     } else {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       setAuthMode(false); if (data.user) await openApp(data.user);
     }
   } catch (err) { setStatus('#authStatus', friendlyError(err), 'error'); }
+});
+$('#resendVerification').addEventListener('click', async () => {
+  const email = pendingSignupEmail || $('#authForm').elements.email.value.trim();
+  if (!email) { setStatus('#authStatus','Escribí tu correo para reenviar la verificación.','error'); return; }
+  setStatus('#authStatus','Enviando nuevo enlace…');
+  const { error } = await supabase.auth.resend({ type:'signup', email, options:{ emailRedirectTo:authRedirectTo() } });
+  if (error) setStatus('#authStatus',friendlyError(error),'error');
+  else setStatus('#authStatus','Listo. Revisá tu correo y abrí el enlace nuevo de Syllabo.','ok');
 });
 $('#forgotPassword').addEventListener('click', async () => {
   const email = $('#authForm').elements.email.value.trim();
