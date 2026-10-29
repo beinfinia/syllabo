@@ -38,7 +38,6 @@ Deno.serve(async (request: Request) => {
     achievement_indicator: clean(input.achievement_indicator, 1500),
     evaluation_criteria: clean(input.evaluation_criteria, 1500),
     duration_minutes: Number(input.duration_minutes), resources: clean(input.resources, 1200),
-    teacher: clean(input.teacher, 120), school: clean(input.school, 180),
   };
   if (!data.subject || !data.grade || !data.topic || !data.content || !data.achievement_indicator || !Number.isInteger(data.duration_minutes) || data.duration_minutes < 10 || data.duration_minutes > 600) {
     return json({ error: "Revisá los datos de asignatura, grado, tema, contenido, indicador y duración." }, 400);
@@ -47,7 +46,7 @@ Deno.serve(async (request: Request) => {
   const minutes = splitMinutes(data.duration_minutes);
   const model = Deno.env.get("OPENAI_MODEL") || "gpt-4.1-mini";
   const systemPrompt = `Sos un asistente para planificación de clases de primaria. Escribí en español claro, con consignas concretas y adecuadas al grado indicado. Generá un borrador que el docente pueda revisar. Usa exclusivamente el contenido, indicador y criterios proporcionados; no inventes citas ni afirmes que el plan cumple una norma curricular no especificada. Devuelve solo un objeto JSON válido con: objective (string), activities (array de exactamente 3 objetos con activity, examples, assessment; no incluyas minutos), evidence (string), differentiation (string), homework (string). La primera actividad activa saberes previos, la segunda desarrolla y practica el contenido con pasos claros, ejemplos y dinámica participativa; la tercera cierra y comprueba el aprendizaje. Evita materiales costosos y propone recursos cotidianos. No repitas el mismo texto entre actividades.`;
-  const userPrompt = `Datos de la clase:\nAsignatura: ${data.subject}\nGrado: ${data.grade}\nTema: ${data.topic}\nContenido: ${data.content}\nIndicador de logro: ${data.achievement_indicator}\nCriterios de evaluación: ${data.evaluation_criteria || "No especificados; propón evidencias observables derivadas del indicador."}\nDuración total: ${data.duration_minutes} minutos; asigna los momentos a ${minutes[0]} min de iniciación, ${minutes[1]} min de desarrollo y ${minutes[2]} min de culminación.\nRecursos disponibles: ${data.resources || "Materiales escolares básicos y recursos del entorno."}\nDocente: ${data.teacher || ""}\nCentro educativo: ${data.school || ""}\nFecha: ${data.lesson_date || ""}\nAsegúrate de que las actividades y ejemplos correspondan al contenido y que la suma de minutos sea exactamente ${data.duration_minutes}.`;
+  const userPrompt = `Datos de la clase:\nAsignatura: ${data.subject}\nGrado: ${data.grade}\nTema: ${data.topic}\nContenido: ${data.content}\nIndicador de logro: ${data.achievement_indicator}\nCriterios de evaluación: ${data.evaluation_criteria || "No especificados; propón evidencias observables derivadas del indicador."}\nDuración total: ${data.duration_minutes} minutos; asigna los momentos a ${minutes[0]} min de iniciación, ${minutes[1]} min de desarrollo y ${minutes[2]} min de culminación.\nRecursos disponibles: ${data.resources || "Materiales escolares básicos y recursos del entorno."}\nFecha: ${data.lesson_date || ""}\nAsegúrate de que las actividades y ejemplos correspondan al contenido y que la suma de minutos sea exactamente ${data.duration_minutes}.`;
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -85,7 +84,6 @@ Deno.serve(async (request: Request) => {
       duration_minutes: data.duration_minutes, topic: data.topic, content: data.content,
       achievement_indicator: data.achievement_indicator, evaluation_criteria: data.evaluation_criteria,
       resources: data.resources || "Materiales escolares básicos y recursos del entorno.",
-      teacher: data.teacher, school: data.school,
       objective: clean(parsed.objective, 900), activities,
       evidence: clean(parsed.evidence, 1200), differentiation: clean(parsed.differentiation, 1200),
       homework: clean(parsed.homework, 700),
