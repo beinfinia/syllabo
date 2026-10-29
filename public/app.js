@@ -59,8 +59,9 @@ async function openApp(user) {
     const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'docente';
     $('#welcomeTitle').textContent = `¡Hola, ${fullName}!`;
     if (profile.primary_grade && !$('#planForm').elements.grade.value) $('#planForm').elements.grade.value = profile.primary_grade;
-    if (profile.first_name) $('#profileForm').elements.first_name.value = profile.first_name;
-    if (profile.last_name) $('#profileForm').elements.last_name.value = profile.last_name;
+    for (const field of ['first_name','last_name','school_name','municipality','primary_grade']) {
+      if (profile[field]) $('#profileForm').elements[field].value = profile[field];
+    }
     await loadHome();
   } catch (err) {
     setStatus('#planStatus', `No se pudo cargar tu perfil: ${friendlyError(err)}`, 'error');
