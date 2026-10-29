@@ -1,9 +1,21 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.2';
 
 const SUPABASE_URL = 'https://rrptfgdshlrfongkfppv.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_VIbLFUuvaksiYulO8-CuCQ_zRY92zUp';
 const PRODUCTION_APP_URL = 'https://syllabo.beinfinia.com/';
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+let lucide = null;
+async function loadIconLibrary() {
+  try {
+    lucide = await import('https://esm.sh/lucide@0.468.0?bundle');
+    renderIcons();
+  } catch (error) { console.warn('No se pudo cargar Lucide Icons.', error); }
+}
+function renderIcons() {
+  if (!lucide) return;
+  lucide.createIcons({ icons: { Mic:lucide.Mic, Eye:lucide.Eye, EyeOff:lucide.EyeOff, Plus:lucide.Plus } });
+}
+void loadIconLibrary();
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
 const weekdays = { 1:'Lunes', 2:'Martes', 3:'Miércoles', 4:'Jueves', 5:'Viernes' };
@@ -12,13 +24,15 @@ function authRedirectTo() {
   if (hostname === 'localhost' || hostname === '127.0.0.1') return PRODUCTION_APP_URL;
   return `${window.location.origin}/`;
 }
+const initialRecoveryParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+let recoveringPassword = initialRecoveryParams.get('type') === 'recovery' || new URLSearchParams(window.location.search).get('type') === 'recovery';
 let currentUser = null;
 let isSignup = false;
 let currentPlanId = null;
 let generatedPlanText = '';
 let generatedPlanData = null;
 let allPlans = [];
-let pendingSignupEmail = '';
+
 let currentProfile = null;
 let openingUserId = null;
 let initializedUserId = null;
@@ -74,28 +88,76 @@ async function openApp(user) {
   try {
     const profile = await ensureProfile(); currentProfile = profile;
     if (!profile.onboarding_completed) {
-      $('#onboarding').classList.remove('hidden');
+      $('#onboarding').classList.remove('hidden'); document.body.classList.add('onboarding-open');
       initializedUserId = user.id; openingUserId = null;
       const form = $('#onboardingForm');
       for (const key of ['first_name','last_name']) form.elements[key].value = profile[key] || user.user_metadata?.[key] || '';
-      populateGradeChoices(form, profile.modality || '');
+      form.elements.modality.value = profile.modality || '';
+      populateGradeChoices(form, profile.modality || '', profile.primary_grade || '');
+      populateSubjectChoices(form, profile.subjects || []);
+      renderIcons();
       return;
     }
-    $('#onboarding').classList.add('hidden'); $('#app').classList.remove('hidden');
+    $('#onboarding').classList.add('hidden'); document.body.classList.remove('onboarding-open'); $('#app').classList.remove('hidden');
     fillTeacherForm($('#profileForm'), profile);
     setTeacherIdentity(profile);
     const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'docente';
     $('#welcomeTitle').textContent = `¡Hola, ${profile.gender === 'mujer' ? 'maestra' : 'maestro'} ${fullName}!`;
     if (profile.primary_grade && !$('#planForm').elements.grade.value) $('#planForm').elements.grade.value = profile.primary_grade;
-    populatePlanSubjectOptions(profile); updatePlanAgeHint(profile);
+    populatePlanSubjectOptions(profile); updatePlanAgeHint(profile); populateScheduleSubjectSuggestions(profile);
     await loadHome();
     initializedUserId = user.id; openingUserId = null;
-  } catch (err) { openingUserId = null; $('#auth').classList.remove('hidden'); setStatus('#authStatus', `No se pudo cargar tu perfil: ${friendlyError(err)}`, 'error'); }
+  } catch (err) { openingUserId = null; $('#onboarding').classList.add('hidden'); document.body.classList.remove('onboarding-open'); $('#auth').classList.remove('hidden'); setStatus('#authStatus', `No se pudo cargar tu perfil: ${friendlyError(err)}`, 'error'); }
 }
-const subjectOptions = ['Lengua y Literatura','Matemáticas','Ciencias Naturales','Estudios Sociales','Educación Física','Convivencia y Civismo','Inglés','Educación Artística'];
-function populateSubjectChoices(form, selected = []) {
+const subjectCatalog = {
+  primary: [
+    'Creciendo en Valores','Derecho y Dignidad de las Mujeres','Educación para Aprender, Emprender, Prosperar',
+    'Estudios Sociales (Historia y Geografía)','Educación Física y Práctica Deportiva','Lengua y Literatura',
+    'Lengua Extranjera (Inglés)','Talleres de Arte y Cultura','Matemática',
+    'Ciencias Naturales (Ciencias de la Vida y el Ambiente)','Conociendo mi Mundo'
+  ],
+  secondary: [
+    'Creciendo en Valores','Derechos y Dignidad de las Mujeres','Educación Física y Práctica Deportiva',
+    'Educación para Aprender, Emprender, Prosperar','Ciencias Sociales (Geografía)','Ciencias Sociales (Historia)',
+    'Ciencias Sociales (Economía)','Ciencias Sociales (Sociología)','Ciencias Sociales (Filosofía)',
+    'Lengua y Literatura','Lengua Extranjera (Inglés y Francés)','Talleres de Arte y Cultura',
+    'Ciencias Naturales (Ciencias de la Vida y el Ambiente)','Química','Física','Biología','Matemática'
+  ]
+};
+function getSubjectsFor(modality, grade) {
+  const number = Number(String(grade || '').match(/\d+/)?.[0] || 0);
+  if (modality === 'primaria') {
+    if (!number || String(grade).toLowerCase().includes('multigrado')) return subjectCatalog.primary;
+    return number > 0 && number <= 2
+      ? subjectCatalog.primary.filter(subject => !subject.startsWith('Estudios Sociales') && !subject.startsWith('Ciencias Naturales')).concat('Conociendo mi Mundo')
+      : subjectCatalog.primary.filter(subject => subject !== 'Conociendo mi Mundo');
+  }
+  if (modality === 'secundaria') {
+    if (!number || String(grade).toLowerCase().includes('multigrado')) return subjectCatalog.secondary;
+    if (number >= 7 && number <= 9) return subjectCatalog.secondary.filter(subject => !/Economía|Sociología|Filosofía|Química|Física|Biología/.test(subject));
+    if (number === 10) return subjectCatalog.secondary.filter(subject => !/Sociología|Filosofía|Biología/.test(subject));
+    if (number === 11) return subjectCatalog.secondary.filter(subject => !/Economía|Química/.test(subject));
+    return subjectCatalog.secondary;
+  }
+  return [];
+}
+function getSelectedSubjects(form) { return [...form.querySelectorAll('input[name="subject_choice"]:checked')].map(input => input.value); }
+function populateSubjectChoices(form, selected = getSelectedSubjects(form)) {
   const container = form.querySelector('[data-subject-choices]'); if (!container) return;
-  container.innerHTML = subjectOptions.map((subject, index) => `<label class="choice"><input type="checkbox" name="subject_choice" value="${escapeHtml(subject)}" ${selected.includes(subject)?'checked':''}>${escapeHtml(subject)}</label>`).join('');
+  const available = getSubjectsFor(form.elements.modality?.value || '', form.elements.primary_grade?.value || '');
+  const known = new Set([...subjectCatalog.primary, ...subjectCatalog.secondary]);
+  const custom = selected.filter(subject => !known.has(subject));
+  const subjects = [...new Set([...available, ...custom])];
+  container.innerHTML = subjects.length ? subjects.map(subject => `<label class="choice"><input type="checkbox" name="subject_choice" value="${escapeHtml(subject)}" ${selected.includes(subject)?'checked':''}>${escapeHtml(subject)}</label>`).join('') : '<span class="muted">Elegí modalidad y grado para ver las materias sugeridas. Podés agregar una asignatura propia abajo.</span>';
+  renderIcons();
+}
+function addCustomSubject(form) {
+  const input = form.elements.custom_subject; const value = String(input.value || '').trim().replace(/\s+/g, ' ');
+  if (!value) { input.focus(); return; }
+  const selected = getSelectedSubjects(form);
+  const duplicate = [...subjectCatalog.primary, ...subjectCatalog.secondary, ...selected].some(subject => subject.toLocaleLowerCase() === value.toLocaleLowerCase());
+  if (duplicate) { input.setCustomValidity('Esa materia ya está en la lista.'); input.reportValidity(); input.setCustomValidity(''); return; }
+  populateSubjectChoices(form, [...selected, value]); input.value = '';
 }
 function populateGradeChoices(form, modality, selected = '') {
   const field = form.elements.primary_grade; if (!field) return;
@@ -105,17 +167,19 @@ function populateGradeChoices(form, modality, selected = '') {
   field.innerHTML = '<option value="">Seleccioná un grado</option>' + options.map(value=>`<option value="${value}">${value}</option>`).join('') + '<option value="Multigrado">Multigrado</option>';
   if (selected && !options.includes(selected) && selected !== 'Multigrado') field.insertAdjacentHTML('beforeend',`<option value="${escapeHtml(selected)}">${escapeHtml(selected)}</option>`);
   field.value = selected || '';
+  populateSubjectChoices(form);
 }
 for (const formId of ['onboardingForm','profileForm']) {
   const form = $(`#${formId}`);
   populateSubjectChoices(form);
-  form.elements.modality.addEventListener('change', () => populateGradeChoices(form, form.elements.modality.value));
+  form.elements.modality.addEventListener('change', () => { populateGradeChoices(form, form.elements.modality.value); });
+  form.elements.primary_grade.addEventListener('change', () => populateSubjectChoices(form));
 }
+document.querySelectorAll('[data-add-subject]').forEach(button => button.addEventListener('click', () => addCustomSubject($(`#${button.dataset.addSubject}`))));
 function readProfileForm(form) {
   const data = Object.fromEntries(new FormData(form).entries());
-  const selectedSubjects=[...form.querySelectorAll('input[name="subject_choice"]:checked')].map(input=>input.value);
-  const customSubjects=String(data.custom_subjects||'').split(',').map(subject=>subject.trim()).filter(Boolean);
-  delete data.custom_subjects; data.subjects=[...new Set([...selectedSubjects,...customSubjects])];
+  const selectedSubjects=getSelectedSubjects(form);
+  delete data.custom_subject; data.subjects=[...new Set(selectedSubjects)];
   data.full_name = [data.first_name.trim(),data.last_name.trim()].filter(Boolean).join(' ');
   data.teacher_context = Object.fromEntries(['student_age_range','context_zone','class_size','internet_access','available_resources','planning_challenges','preferred_dynamics'].map(key=>[key,data[key] || '']));
   for (const key of Object.keys(data.teacher_context)) delete data[key];
@@ -125,7 +189,6 @@ function fillTeacherForm(form, profile) {
   for (const key of ['first_name','last_name','gender','modality','primary_grade','school_name','municipality']) if (form.elements[key]) form.elements[key].value = profile[key] || '';
   populateGradeChoices(form,profile.modality || '',profile.primary_grade || '');
   populateSubjectChoices(form,profile.subjects || []);
-  if(form.elements.custom_subjects)form.elements.custom_subjects.value=(profile.subjects||[]).filter(subject=>!subjectOptions.includes(subject)).join(', ');
   const context = profile.teacher_context || {};
   for (const key of ['student_age_range','context_zone','class_size','internet_access','available_resources','planning_challenges','preferred_dynamics']) if (form.elements[key]) form.elements[key].value = context[key] || '';
 }
@@ -145,10 +208,10 @@ async function saveTeacherProfile(form, onboarding = false) {
   const {data:saved,error} = await supabase.from('teacher_profiles').upsert(row).select().single();
   if (error) throw error;
   currentProfile = saved; fillTeacherForm($('#profileForm'),saved); setTeacherIdentity(saved);
-  $('#welcomeTitle').textContent = `¡Hola, ${saved.gender === 'mujer' ? 'maestra' : 'maestro'} ${saved.first_name}!`;
+  $('#welcomeTitle').textContent = `¡Hola, ${saved.gender === 'mujer' ? 'maestra' : 'maestro'} ${[saved.first_name, saved.last_name].filter(Boolean).join(' ')}!`;
   if (saved.primary_grade) $('#planForm').elements.grade.value = saved.primary_grade;
-  populatePlanSubjectOptions(saved); updatePlanAgeHint(saved);
-  if (onboarding) { $('#onboarding').classList.add('hidden'); $('#app').classList.remove('hidden'); await loadHome(); }
+  populatePlanSubjectOptions(saved); updatePlanAgeHint(saved); populateScheduleSubjectSuggestions(saved);
+  if (onboarding) { $('#onboarding').classList.add('hidden'); document.body.classList.remove('onboarding-open'); $('#app').classList.remove('hidden'); await loadHome(); }
   return saved;
 }
 let activeRecognition = null;
@@ -158,11 +221,11 @@ function startDictation(button) {
   if(activeRecognition){activeRecognition.stop();activeRecognition=null;}
   const field=document.getElementById(button.dataset.dictate); const recognition=new Recognition();
   recognition.lang='es-NI';recognition.interimResults=false;recognition.maxAlternatives=1;activeRecognition=recognition;
-  button.classList.add('listening');button.textContent='Escuchando…';button.setAttribute('aria-pressed','true');setStatus('#planStatus','Hablá ahora; al terminar, el texto aparecerá en el campo.');
+  button.classList.add('listening');button.innerHTML='<i data-lucide="mic" aria-hidden="true"></i><span>Escuchando…</span>';button.setAttribute('aria-pressed','true');renderIcons();setStatus('#planStatus','Hablá ahora; al terminar, el texto aparecerá en el campo.');
   recognition.onresult=event=>{const transcript=event.results?.[0]?.[0]?.transcript?.trim();if(transcript){field.value=`${field.value.trim()}${field.value.trim()?' ':''}${transcript}`;field.dispatchEvent(new Event('input',{bubbles:true}));}};
   recognition.onerror=event=>{const message=event.error==='not-allowed'?'Permití el acceso al micrófono para dictar.':event.error==='no-speech'?'No detecté voz. Intentá de nuevo.':event.error==='network'?'El servicio de reconocimiento necesita conexión. Revisá internet e intentá otra vez.':'No se pudo iniciar el dictado. Revisá el micrófono e intentá de nuevo.';setStatus('#planStatus',message,'error');};
-  recognition.onend=()=>{button.classList.remove('listening');button.textContent='🎙 Dictar';button.setAttribute('aria-pressed','false');if(activeRecognition===recognition)activeRecognition=null;};
-  try{recognition.start();}catch{button.classList.remove('listening');button.textContent='🎙 Dictar';button.setAttribute('aria-pressed','false');activeRecognition=null;setStatus('#planStatus','No se pudo iniciar el micrófono. Esperá un momento e intentá de nuevo.','error');}
+  recognition.onend=()=>{button.classList.remove('listening');button.innerHTML='<i data-lucide="mic" aria-hidden="true"></i><span>Dictar</span>';button.setAttribute('aria-pressed','false');renderIcons();if(activeRecognition===recognition)activeRecognition=null;};
+  try{recognition.start();}catch{button.classList.remove('listening');button.innerHTML='<i data-lucide="mic" aria-hidden="true"></i><span>Dictar</span>';button.setAttribute('aria-pressed','false');renderIcons();activeRecognition=null;setStatus('#planStatus','No se pudo iniciar el micrófono. Esperá un momento e intentá de nuevo.','error');}
 }
 document.querySelectorAll('[data-dictate]').forEach(button=>button.addEventListener('click',()=>startDictation(button)));
 $('#onboardingForm').addEventListener('submit', async event => {
@@ -184,12 +247,7 @@ function setAuthMode(signup) {
   $('#authTitle').textContent = isSignup ? 'Crear cuenta docente' : 'Ingresar';
   $('#authSubmit').textContent = isSignup ? 'Crear cuenta' : 'Ingresar';
   $('#toggleAuth').textContent = isSignup ? 'Ya tengo cuenta' : 'Crear cuenta';
-  $('#nameWrap').classList.toggle('hidden', !isSignup);
-  $('#authForm').elements.first_name.required = isSignup;
-  $('#authForm').elements.last_name.required = isSignup;
   $('#authForm').elements.password.autocomplete = isSignup ? 'new-password' : 'current-password';
-  const emailEntered = Boolean($('#authForm').elements.email.value.trim());
-  $('#resendVerification').classList.toggle('hidden', !pendingSignupEmail && (isSignup || !emailEntered));
   try { sessionStorage.setItem('syllabo_auth_mode', isSignup ? 'signup' : 'login'); } catch {}
 }
 let savedAuthMode = 'login';
@@ -200,30 +258,21 @@ document.querySelectorAll('[data-password-toggle]').forEach(button => button.add
   const input = document.getElementById(button.dataset.passwordToggle);
   const show = input.type === 'password';
   input.type = show ? 'text' : 'password';
-  button.textContent = show ? 'Ocultar' : 'Mostrar';
+  button.innerHTML = `<i data-lucide="${show ? 'eye-off' : 'eye'}" aria-hidden="true"></i><span>${show ? 'Ocultar' : 'Mostrar'}</span>`;
   button.setAttribute('aria-pressed', String(show));
   button.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
+  renderIcons();
 }));
-$('#authForm').elements.email.addEventListener('input', () => {
-  const showResend = Boolean(pendingSignupEmail || (!isSignup && $('#authForm').elements.email.value.trim()));
-  $('#resendVerification').classList.toggle('hidden', !showResend);
-});
 $('#authForm').addEventListener('submit', async event => {
-  event.preventDefault(); setStatus('#authStatus', isSignup ? 'Creando tu cuenta…' : 'Ingresando…');
+  event.preventDefault(); const button = $('#authSubmit'); button.disabled = true;
+  setStatus('#authStatus', isSignup ? 'Creando tu cuenta…' : 'Ingresando…');
   const form = new FormData(event.currentTarget); const email = String(form.get('email') || '').trim(); const password = String(form.get('password') || '');
   try {
     if (isSignup) {
-      const first_name = String(form.get('first_name') || '').trim();
-      const last_name = String(form.get('last_name') || '').trim();
-      const full_name = [first_name, last_name].filter(Boolean).join(' ');
-      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { first_name, last_name, full_name }, emailRedirectTo: authRedirectTo() } });
+      const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: authRedirectTo() } });
       if (error) throw error;
       if (data.session && data.user) await openApp(data.user);
-      else {
-        pendingSignupEmail = email;
-        $('#resendVerification').classList.remove('hidden');
-        setStatus('#authStatus', 'Cuenta creada. Revisá tu correo y confirmá el registro antes de ingresar.', 'ok');
-      }
+      else setStatus('#authStatus', 'Supabase todavía exige confirmar el correo. Desactivá “Confirm email” en Authentication → Sign In / Providers → Email para permitir el ingreso inmediato.', 'error');
     } else {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
@@ -231,32 +280,47 @@ $('#authForm').addEventListener('submit', async event => {
       setAuthMode(false); if (data.user) await openApp(data.user);
     }
   } catch (err) { setStatus('#authStatus', friendlyError(err), 'error'); }
+  finally { button.disabled = false; }
 });
-$('#resendVerification').addEventListener('click', async () => {
-  const email = pendingSignupEmail || $('#authForm').elements.email.value.trim();
-  if (!email) { setStatus('#authStatus','Escribí tu correo para reenviar la verificación.','error'); return; }
-  setStatus('#authStatus','Enviando nuevo enlace…');
-  const { error } = await supabase.auth.resend({ type:'signup', email, options:{ emailRedirectTo:authRedirectTo() } });
-  if (error) setStatus('#authStatus',friendlyError(error),'error');
-  else setStatus('#authStatus','Listo. Revisá tu correo y abrí el enlace nuevo de Syllabo.','ok');
+$('#forgotPassword').addEventListener('click', () => {
+  $('#authForm').classList.add('hidden'); $('#forgotForm').classList.remove('hidden'); $('#forgotForm').elements.email.value = $('#authForm').elements.email.value.trim();
+  setStatus('#authStatus'); $('#forgotForm').elements.email.focus();
 });
-$('#forgotPassword').addEventListener('click', async () => {
-  const email = $('#authForm').elements.email.value.trim();
-  if (!email) { setStatus('#authStatus', 'Escribí tu correo para enviarte el enlace de recuperación.', 'error'); $('#authForm').elements.email.focus(); return; }
-  setStatus('#authStatus', 'Enviando enlace…');
-  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: authRedirectTo() });
-  if (error) setStatus('#authStatus', friendlyError(error), 'error');
-  else setStatus('#authStatus', 'Si el correo está registrado, recibirás un enlace para cambiar tu contraseña.', 'ok');
+$('#cancelForgot').addEventListener('click', () => {
+  $('#forgotForm').classList.add('hidden'); $('#authForm').classList.remove('hidden'); setAuthMode(false); setStatus('#authStatus');
+});
+$('#forgotForm').addEventListener('submit', async event => {
+  event.preventDefault(); const email = event.currentTarget.elements.email.value.trim();
+  const button = event.currentTarget.querySelector('button[type="submit"]'); button.disabled = true; setStatus('#authStatus', 'Enviando enlace de recuperación…');
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: authRedirectTo() });
+    if (error) throw error;
+    $('#forgotForm').classList.add('hidden'); $('#authForm').classList.remove('hidden'); setAuthMode(false);
+    setStatus('#authStatus', 'Si el correo está registrado, recibirás un enlace de recuperación. Revisá también spam.', 'ok');
+  } catch (error) { setStatus('#authStatus', friendlyError(error), 'error'); }
+  finally { button.disabled = false; }
 });
 $('#recoveryForm').addEventListener('submit', async event => {
   event.preventDefault(); const password = new FormData(event.currentTarget).get('password');
   if (String(password).length < 8) { setStatus('#authStatus','La contraseña debe tener al menos 8 caracteres.','error'); return; }
-  const { error } = await supabase.auth.updateUser({ password });
-  if (error) setStatus('#authStatus',friendlyError(error),'error');
-  else { $('#recoveryForm').classList.add('hidden'); $('#authForm').classList.remove('hidden'); setAuthMode(false); setStatus('#authStatus','Contraseña actualizada. Ya podés ingresar.','ok'); }
+  const button = event.currentTarget.querySelector('button[type="submit"]'); button.disabled = true; setStatus('#authStatus','Actualizando contraseña…');
+  try {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw error;
+    recoveringPassword = false;
+    history.replaceState(null, '', `${location.pathname}${location.search}`);
+    await supabase.auth.signOut();
+    $('#recoveryForm').reset(); $('#recoveryForm').classList.add('hidden'); $('#authForm').classList.remove('hidden'); setAuthMode(false);
+    setStatus('#authStatus','Contraseña actualizada. Ya podés ingresar con tu correo y la nueva contraseña.','ok');
+  } catch (error) { setStatus('#authStatus',friendlyError(error),'error'); }
+  finally { button.disabled = false; }
+});
+$('#cancelRecovery').addEventListener('click', async () => {
+  recoveringPassword = false; await supabase.auth.signOut(); history.replaceState(null, '', `${location.pathname}${location.search}`);
+  $('#recoveryForm').reset(); $('#recoveryForm').classList.add('hidden'); $('#authForm').classList.remove('hidden'); setAuthMode(false); setStatus('#authStatus','Podés ingresar con tu correo y contraseña.');
 });
 $('#logout').addEventListener('click', async () => {
-  await supabase.auth.signOut(); currentUser = null; currentProfile=null; openingUserId=null; initializedUserId=null; setAuthMode(false); $('#app').classList.add('hidden'); $('#onboarding').classList.add('hidden'); $('#auth').classList.remove('hidden'); setStatus('#authStatus', 'Sesión cerrada.');
+  await supabase.auth.signOut(); currentUser = null; currentProfile=null; openingUserId=null; initializedUserId=null; setAuthMode(false); $('#app').classList.add('hidden'); $('#onboarding').classList.add('hidden'); document.body.classList.remove('onboarding-open'); $('#auth').classList.remove('hidden'); $('#forgotForm').classList.add('hidden'); $('#recoveryForm').classList.add('hidden'); $('#authForm').classList.remove('hidden'); recoveringPassword=false; setStatus('#authStatus', 'Sesión cerrada.');
 });
 
 function splitActivities(plan) {
@@ -570,16 +634,17 @@ async function loadHome() {
   $('#planningAlerts').querySelectorAll('[data-plan-class]').forEach(button=>button.addEventListener('click',()=>{const form=$('#planForm');form.reset();form.elements.lesson_date.value=button.dataset.planClass;setPlanSubject(button.dataset.subject);form.elements.grade.value=button.dataset.grade;form.elements.duration_minutes.value=button.dataset.duration;$('#planPreview').innerHTML='';currentPlanId=null;showPage('crear');}));
 }
 
-let recoveringPassword = false;
+function showRecoveryForm() {
+  recoveringPassword = true;
+  $('#auth').classList.remove('hidden'); $('#app').classList.add('hidden'); $('#onboarding').classList.add('hidden'); document.body.classList.remove('onboarding-open');
+  $('#authForm').classList.add('hidden'); $('#forgotForm').classList.add('hidden'); $('#recoveryForm').classList.remove('hidden');
+  setStatus('#authStatus','Elegí una contraseña nueva de al menos 8 caracteres.');
+  requestAnimationFrame(() => $('#recoveryForm').elements.password.focus());
+}
+if (recoveringPassword) showRecoveryForm();
 supabase.auth.onAuthStateChange((event, session) => {
-  if (event === 'PASSWORD_RECOVERY') {
-    recoveringPassword = true;
-    $('#auth').classList.remove('hidden'); $('#app').classList.add('hidden');
-    $('#authForm').classList.add('hidden'); $('#recoveryForm').classList.remove('hidden'); $('#recoveryForm').elements.password.focus();
-    setStatus('#authStatus','Elegí una contraseña nueva de al menos 8 caracteres.');
-    return;
-  }
-  if (session?.user && !recoveringPassword && $('#app').classList.contains('hidden')) openApp(session.user);
+  if (event === 'PASSWORD_RECOVERY') { showRecoveryForm(); return; }
+  if (session?.user && !recoveringPassword && $('#app').classList.contains('hidden')) setTimeout(() => openApp(session.user), 0);
 });
 const { data:{ session } } = await supabase.auth.getSession();
 if (session?.user && !recoveringPassword && $('#app').classList.contains('hidden')) await openApp(session.user);

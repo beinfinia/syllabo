@@ -5,10 +5,12 @@ Asistente de planificación docente con ficha de bienvenida, perfil, agenda sema
 ## Funciones
 
 - Registro e inicio de sesión con correo y contraseña mediante Supabase Auth.
-- Recuperación de contraseña por correo.
-- Ficha inicial de docente: nombre, apellido, género para el trato y avatar, modalidad, grado y materias que imparte.
+- Recuperación de contraseña por correo con formulario de solicitud y cambio de contraseña.
+- Ficha inicial obligatoria en una ventana modal: nombre, apellido, género para el trato y avatar, modalidad, grado, materias y contexto docente. Se vuelve a mostrar si se sale antes de completarla.
+- Materias sugeridas según modalidad y grado; el docente puede agregar asignaturas de su centro.
 - Encuesta breve del entorno docente, incluida la edad más frecuente del grupo; las respuestas quedan en el perfil y ayudan a adecuar actividades y ejemplos.
 - La materia se elige desde las materias guardadas por el docente y el grado se completa desde el perfil.
+- Iconos Lucide coherentes para dictado por voz, mostrar/ocultar contraseña y acciones.
 - Dictado por voz en tema, contenido, indicador, criterios y recursos; usa el reconocimiento del navegador y puede enviar audio al servicio de voz de ese navegador según su configuración.
 - Biblioteca de planes con búsqueda, filtros por asignatura y mes y orden por fecha, materia o tema.
 - Horario semanal como agenda por día y hora, con un botón para establecerlo y alertas de clases que necesitan planificación.
@@ -37,13 +39,20 @@ Sirve la carpeta `public/` con cualquier servidor estático. La app utiliza Supa
 
 No requiere build ni variables de entorno para publicar la versión web. Configurá en Supabase Auth las URL autorizadas del dominio de Pages, incluida la URL de producción.
 
-## Verificación por correo
+## Acceso y recuperación
 
-La URL oficial de retorno de registro y recuperación es `https://syllabo.beinfinia.com/`, incluso si la cuenta se creó desde `localhost`. En **Supabase → Authentication → URL Configuration**, poné esa dirección como **Site URL** y agregala a **Redirect URLs**. También conectá el dominio personalizado a Cloudflare Pages. Supabase debe permitir la redirección para que el enlace abra el sitio publicado.
+El acceso usa correo y contraseña. Para que el registro inicie sesión inmediatamente sin confirmar el correo, desactivá **Supabase → Authentication → Settings → Email → Confirm email**. La interfaz informa si esa opción sigue activa en el proyecto.
 
-Si ya se creó una cuenta pero su enlace anterior apunta a `localhost`, desde la pantalla de acceso se puede escribir el correo y usar **Reenviar correo de verificación** para recibir un enlace nuevo.
+La URL de retorno para recuperar la contraseña es `https://syllabo.beinfinia.com/`. En **Supabase → Authentication → URL Configuration**, agregá esa dirección a **Redirect URLs** y confirmá que el dominio de producción esté conectado a Cloudflare Pages. Si los correos se siguen remitiendo a `localhost`, corregí también el **Site URL** y las plantillas de correo en Supabase.
 
-El remitente puede seguir apareciendo como Supabase mientras se use el correo SMTP predeterminado. Para que el correo diga Syllabo hace falta configurar SMTP propio en Supabase Auth y un remitente/dominio verificado; cambiar solo la plantilla no cambia el proveedor del remitente.
+## Asignaturas sugeridas
+
+Las materias se filtran según modalidad y grado. La lista inicial sigue los planes de estudio publicados por el Ministerio de Educación de Nicaragua; el docente puede agregar las asignaturas que use su centro:
+
+- Primaria: [Plan de estudios de Educación Primaria Regular (carga semanal, vigente desde 2019)](https://nicaraguaeduca.mined.gob.ni/wp-content/uploads/2023/09/I-UP-PR-29082023-VF.pdf). En 1.º y 2.º, Estudios Sociales y Ciencias Naturales se integran en Conociendo mi Mundo; de 3.º a 6.º aparecen como asignaturas separadas.
+- Secundaria regular: [Plan de estudios de Educación Secundaria Regular (carga semanal, vigente desde 2019)](https://nicaraguaeduca.mined.gob.ni/wp-content/uploads/2023/07/V-UP-EFPD-SR.pdf), con opciones diferenciadas por grado para Ciencias Sociales y las ciencias de 7.º a 11.º.
+
+La aplicación presenta la selección de materias con el nombre pedagógico del área/asignatura y no usa marcas institucionales en la interfaz.
 
 ## IA externa
 
