@@ -1,4 +1,4 @@
-const CACHE='syllabo-shell-v7';
+const CACHE='syllabo-shell-v8';
 const ASSETS=['./','./index.html','./offline.js','./pdf.js','./mobile.css','./manifest.webmanifest','./logo.svg','./app.js','./ui.js',
   ...['avatar-man','avatar-woman','avatar-flower','avatar-owl','avatar-book','book','calendar','check','clock','create','eye-off','eye','home','mic','plus','sparkle','user'].map(name=>'./icons/'+name+'.svg')];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));

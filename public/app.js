@@ -251,7 +251,7 @@ function setTeacherIdentity(profile) {
   applyReadingPreference(profile.teacher_context?.reading_size);
   const avatar=$('#teacherAvatar'); const selected=profile.teacher_context?.avatar || (profile.gender==='mujer'?'woman':'man');
   const choice=['woman','man','flower','owl','book'].includes(selected)?selected:'woman';
-  avatar.innerHTML=`<img class="avatar-image" src="./icons/avatar-${choice}.svg" alt="">`;
+  avatar.innerHTML=`<img class="avatar-image" src="./icons/avatar-${choice}.svg?v=distinct-3" alt="">`;
   const name=[profile.first_name,profile.last_name].filter(Boolean).join(' ');avatar.setAttribute('aria-label',`Avatar de ${name||'docente'}`);avatar.title=name||'Docente';
 }
 async function saveTeacherProfile(form, onboarding = false) {
